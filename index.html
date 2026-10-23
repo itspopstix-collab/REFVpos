@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My POS System</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .container { display: flex; gap: 20px; max-width: 1000px; margin: 0 auto; }
+        
+        /* ฝั่งสินค้า */
+        .products-grid { flex: 2; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .product-card { 
+            background: white; padding: 20px; border-radius: 10px; text-align: center; 
+            cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; border: 2px solid transparent;
+        }
+        .product-card:active { border-color: #4CAF50; transform: scale(0.95); }
+        .product-name { font-size: 1.1em; font-weight: bold; margin-bottom: 5px; }
+        .product-price { color: #4CAF50; font-size: 1.2em; }
+
+        /* ฝั่งตะกร้าสินค้า */
+        .cart-section { flex: 1; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .cart-items { flex-grow: 1; min-height: 200px; overflow-y: auto; margin-bottom: 20px; border-bottom: 2px dashed #eee; padding-bottom: 10px; }
+        .cart-item { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1em; }
+        .total-box { font-size: 1.5em; font-weight: bold; text-align: space-between; margin-bottom: 20px; }
+        
+        /* ปุ่มและ QR */
+        button { width: 100%; padding: 15px; font-size: 1.2em; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; margin-bottom: 10px; }
+        .btn-checkout { background-color: #4CAF50; }
+        .btn-clear { background-color: #f44336; }
+        #qr-display { text-align: center; margin-top: 15px; }
+        #qr-display img { max-width: 200px; border-radius: 10px; }
+
+        /* รองรับหน้าจอแนวตั้ง (iPad Portrait / Mobile) */
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>POS ชำระเงินด่วน</h1>
+    </div>
+
+    <div class="container">
+        <!-- โซนเลือกสินค้า -->
+        <div class="products-grid" id="product-list">
+            <!-- สินค้าจะถูกสร้างตรงนี้ด้วย JavaScript -->
+        </div>
+
+        <!-- โซนตะกร้าและคิดเงิน -->
+        <div class="cart-section">
+            <h2>ตะกร้าสินค้า</h2>
+            <div class="cart-items" id="cart-items">
+                <!-- รายการในตะกร้า -->
+            </div>
+            
+            <div class="total-box">
+                <span>ยอดรวม: </span>
+                <span id="total-price" style="color:#e91e63;">0</span>
+                <span> ฿</span>
+            </div>
+
+            <button class="btn-checkout" onclick="generateQR()">💳 ชำระเงิน (สร้าง QR)</button>
+            <button class="btn-clear" onclick="clearCart()">🗑️ ล้างตะกร้า</button>
+            
+            <div id="qr-display"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. ตั้งค่าเบอร์พร้อมเพย์ของคุณที่นี่ (เปลี่ยนจาก 0812345678 เป็นเบอร์ของคุณ) ---
+        const PROMPTPAY_NUMBER = "0812345678"; 
+
+        // --- 2. เพิ่ม/ลด รายการสินค้าของคุณที่นี่ ---
+        const products = [
+            { id: 'p1', name: 'กาแฟเย็น', price: 50 },
+            { id: 'p2', name: 'ชาเขียว', price: 60 },
+            { id: 'p3', name: 'ชานมไข่มุก', price: 55 },
+            { id: 'p4', name: 'เค้กส้ม', price: 85 },
+            { id: 'p5', name: 'ครัวซองต์', price: 65 },
+            { id: 'p6', name: 'น้ำเปล่า', price: 15 }
+        ];
+
+        let cart = {};
+
+        // ฟังก์ชันสร้างปุ่มสินค้าลงบนหน้าเว็บ
+        function renderProducts() {
+            const productList = document.getElementById('product-list');
+            products.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                card.onclick = () => addToCart(p.id, p.name, p.price);
+                card.innerHTML = `
+                    <div class="product-name">${p.name}</div>
+                    <div class="product-price">${p.price} ฿</div>
+                `;
+                productList.appendChild(card);
+            });
+        }
+
+        // ฟังก์ชันเพิ่มสินค้าลงตะกร้า
+        function addToCart(id, name, price) {
+            if (cart[id]) {
+                cart[id].qty++;
+            } else {
+                cart[id] = { name: name, price: price, qty: 1 };
+            }
+            updateCartUI();
+        }
+
+        // ฟังก์ชันอัปเดตหน้าจอหลัก (คำนวณเงิน)
+        function updateCartUI() {
+            const cartItemsDiv = document.getElementById('cart-items');
+            cartItemsDiv.innerHTML = '';
+            let total = 0;
+
+            for (let id in cart) {
+                const item = cart[id];
+                const itemTotal = item.price * item.qty;
+                total += itemTotal;
+
+                cartItemsDiv.innerHTML += `
+                    <div class="cart-item">
+                        <span>${item.name} (x${item.qty})</span>
+                        <span>${itemTotal} ฿</span>
+                    </div>
+                `;
+            }
+            document.getElementById('total-price').innerText = total;
+        }
+
+        // ฟังก์ชันสร้าง QR Code
+        function generateQR() {
+            const total = parseFloat(document.getElementById('total-price').innerText);
+            if (total === 0) {
+                alert("กรุณาเลือกสินค้าก่อนชำระเงิน!");
+                return;
+            }
+            
+            // ดึง API จาก promptpay.io
+            const qrUrl = `https://promptpay.io/${PROMPTPAY_NUMBER}/${total}.png`;
+            document.getElementById('qr-display').innerHTML = `
+                <p style="margin-bottom: 5px;">สแกนเพื่อจ่าย <b>${total}</b> บาท</p>
+                <img src="${qrUrl}" alt="PromptPay QR Code">
+            `;
+        }
+
+        // ฟังก์ชันล้างตะกร้า
+        function clearCart() {
+            cart = {};
+            updateCartUI();
+            document.getElementById('qr-display').innerHTML = '';
+        }
+
+        // สั่งให้ระบบวาดสินค้าตอนเปิดเว็บครั้งแรก
+        window.onload = renderProducts;
+    </script>
+</body>
+</html>
