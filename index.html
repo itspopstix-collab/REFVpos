@@ -1,163 +1,353 @@
 <!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My POS System</title>
-    <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
-        .header { text-align: center; margin-bottom: 20px; }
-        .container { display: flex; gap: 20px; max-width: 1000px; margin: 0 auto; }
-        
-        /* ฝั่งสินค้า */
-        .products-grid { flex: 2; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
-        .product-card { 
-            background: white; padding: 20px; border-radius: 10px; text-align: center; 
-            cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; border: 2px solid transparent;
-        }
-        .product-card:active { border-color: #4CAF50; transform: scale(0.95); }
-        .product-name { font-size: 1.1em; font-weight: bold; margin-bottom: 5px; }
-        .product-price { color: #4CAF50; font-size: 1.2em; }
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#118cd1">
+<title>REFV Gelato POS</title>
+<link rel="icon" href="images/logo.png">
+<style>
+:root{--bg:#fef9ec;--pri:#118cd1;--sky:#90d4ec;--ink:#0d3a57;--mut:#6b8799;--card:#fff;--line:#eae3cf;--ok:#1a9a5b;--r:20px;color-scheme:light}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;position:sticky;top:0;background:var(--bg);z-index:5}
+.logo{height:46px;width:auto;display:block}
+.tabs{display:flex;background:#fff;border-radius:99px;padding:4px;box-shadow:0 1px 4px #0001}
+.tabs button{padding:9px 16px;border-radius:99px;font-weight:600;color:var(--mut)}
+.tabs button.on{background:var(--pri);color:#fff}
+.app{display:grid;grid-template-columns:1fr;gap:16px;max-width:1200px;margin:0 auto;padding:0 16px 140px}
+@media(min-width:900px){.app{grid-template-columns:1fr 380px;padding-bottom:24px}}
+.card{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:0 2px 10px #118cd114}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{flex:1;min-width:110px;padding:14px;border-radius:14px;background:var(--bg);font-weight:700;border:2px solid transparent}
+.seg button.on{background:var(--pri);color:#fff}
+.lab{font-size:13px;color:var(--mut);margin:12px 0 6px;font-weight:600}.lab:first-child{margin-top:0}
+.cat{display:flex;align-items:baseline;justify-content:space-between;margin:20px 4px 10px}
+.cat b{font-size:20px}.cat span{color:var(--pri);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.fl{position:relative;background:#fff;border-radius:var(--r);overflow:hidden;box-shadow:0 2px 10px #118cd114;text-align:left;border:3px solid transparent;transition:transform .1s}
+.fl:active{transform:scale(.97)}.fl.on{border-color:var(--pri)}
+.fl img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--sky)}
+.fl .t{padding:10px 12px}.fl .t b{display:block;font-size:15px;line-height:1.2;min-height:36px}
+.chip{display:inline-block;margin-top:4px;background:var(--sky);color:var(--ink);border-radius:99px;padding:2px 10px;font-weight:700;font-size:13px}
+.fl .n{position:absolute;top:8px;left:8px;background:var(--pri);color:#fff;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800}
+.fl.new{display:grid;place-items:center;border:2px dashed var(--sky);background:transparent;box-shadow:none;min-height:150px;color:var(--pri);font-weight:700;text-align:center}
+.x{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:#fffd;font-size:13px;color:var(--mut);z-index:2}
+.dock{position:fixed;left:0;right:0;bottom:0;background:#fff;box-shadow:0 -4px 20px #0d3a5722;padding:12px 16px calc(12px + env(safe-area-inset-bottom));z-index:6}
+@media(min-width:900px){.dock{position:sticky;bottom:12px;border-radius:var(--r);margin-top:16px;padding:12px 16px}}
+.dock .r{display:flex;gap:10px;align-items:center;max-width:1200px;margin:0 auto}
+.slots{flex:1;font-size:14px;color:var(--mut);min-width:0}.slots b{color:var(--ink)}
+.btn{background:var(--pri);color:#fff;font-weight:700;border-radius:14px;padding:14px 20px;white-space:nowrap}
+.btn:disabled{opacity:.35}.btn.sec{background:var(--sky);color:var(--ink)}.btn.ghost{background:var(--bg);color:var(--ink)}
+.cartbar{margin-top:8px}@media(min-width:900px){.cartbar{display:none}}
+aside{display:none}aside.open{display:block;position:fixed;inset:0;background:var(--bg);z-index:9;overflow:auto;padding:12px 16px calc(20px + env(safe-area-inset-bottom))}
+@media(min-width:900px){aside,aside.open{display:block;position:sticky;top:70px;align-self:start;inset:auto;padding:0;max-height:calc(100vh - 80px);overflow:auto;z-index:1;background:none}.close{display:none}}
+.line{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.line small{color:var(--mut);display:block}
+.tot{display:flex;justify-content:space-between;align-items:baseline;font-size:26px;font-weight:800;margin:12px 0}
+input[type=text],input[type=number],input[type=url]{width:100%;font:inherit;padding:13px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
+.qr{background:#fff;border:2px solid var(--sky);border-radius:16px;padding:12px;text-align:center}.qr svg{width:100%;max-width:230px;height:auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi small{color:var(--mut);font-weight:600}.kpi b{display:block;font-size:26px}
+.rep{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px}
+.rep h3{margin:0 0 12px;font-size:16px}
+.vc{display:flex;align-items:flex-end;gap:3px;height:150px}.vc div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vc i{display:block;width:100%;background:var(--sky);border-radius:6px 6px 0 0;min-height:2px}.vc .hi i{background:var(--pri)}.vc span{font-size:10px;color:var(--mut);height:14px;white-space:nowrap}
+.hb{display:grid;grid-template-columns:110px 1fr auto;gap:8px;align-items:center;margin:7px 0;font-size:14px}
+.hb em{font-style:normal;display:block;height:14px;border-radius:8px;background:var(--sky)}.hb.hi em{background:var(--pri)}.hb span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note{background:#fff8d8;border-radius:14px;padding:12px;font-size:14px;margin:12px 0}
+dialog{border:0;border-radius:var(--r);padding:20px;width:min(420px,92vw);color:var(--ink)}dialog::backdrop{background:#0d3a5780}
+.toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:var(--ok);color:#fff;padding:12px 20px;border-radius:99px;font-weight:700;z-index:20;box-shadow:0 6px 20px #0003}
+.hide{display:none!important}.mut{color:var(--mut);font-size:14px}.row{display:flex;gap:8px;flex-wrap:wrap}
+</style></head><body>
+<header><img class="logo" src="images/logo.png" alt="REFV Gelatogato">
+<nav class="tabs" id="tabs"></nav></header>
 
-        /* ฝั่งตะกร้าสินค้า */
-        .cart-section { flex: 1; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-        .cart-items { flex-grow: 1; min-height: 200px; overflow-y: auto; margin-bottom: 20px; border-bottom: 2px dashed #eee; padding-bottom: 10px; }
-        .cart-item { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1em; }
-        .total-box { font-size: 1.5em; font-weight: bold; text-align: space-between; margin-bottom: 20px; }
-        
-        /* ปุ่มและ QR */
-        button { width: 100%; padding: 15px; font-size: 1.2em; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; margin-bottom: 10px; }
-        .btn-checkout { background-color: #4CAF50; }
-        .btn-clear { background-color: #f44336; }
-        #qr-display { text-align: center; margin-top: 15px; }
-        #qr-display img { max-width: 200px; border-radius: 10px; }
+<div id="sell" class="app">
+ <main>
+  <div class="card">
+   <div class="lab">Type</div><div class="seg" id="types"></div>
+   <div id="cupsBox"><div class="lab">Flavors per cup</div><div class="seg" id="cups"></div></div>
+  </div>
+  <div id="menu"></div>
+  <div class="dock"><div class="r">
+    <div class="slots" id="slots"></div>
+    <button class="btn" id="addBtn">Add</button></div>
+    <button class="btn ghost cartbar" id="cartBtn" style="width:100%"></button>
+  </div>
+ </main>
+ <aside id="cart"><div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Order</h2><button class="btn ghost close" id="closeCart">Close</button></div>
+  <div id="lines"></div>
+  <div class="tot"><span>Total</span><span id="total"></span></div>
+  <div class="lab">Payment</div>
+  <div class="seg"><button id="payCash">💵 Cash</button><button id="payQR">📱 QR</button></div>
+  <div id="cashBox"><div class="lab">Cash received</div><input type="number" inputmode="numeric" id="recv">
+   <div class="row" style="margin-top:8px" id="quick"></div>
+   <div class="tot" style="font-size:20px"><span>Change</span><span id="change"></span></div></div>
+  <div id="qrBox" class="qr hide"><div id="qrImg"></div><div id="qrTxt" class="mut"></div></div>
+  <button class="btn" id="confirm" style="width:100%;margin-top:12px;font-size:18px">Confirm payment</button>
+  <button class="btn ghost" id="clearCart" style="width:100%;margin-top:8px">Clear order</button>
+ </div></aside>
+</div>
 
-        /* รองรับหน้าจอแนวตั้ง (iPad Portrait / Mobile) */
-        @media (max-width: 768px) {
-            .container { flex-direction: column; }
-        }
-    </style>
-</head>
-<body>
+<div id="report" class="app hide" style="grid-template-columns:1fr;padding-bottom:30px"><main>
+ <div class="seg" id="period" style="margin-bottom:12px"></div>
+ <div class="kpis" id="kpis"></div>
+ <div class="note" id="insight"></div>
+ <div class="rep" id="charts"></div>
+</main></div>
 
-    <div class="header">
-        <h1>POS ชำระเงินด่วน</h1>
-    </div>
+<div id="settings" class="app hide" style="grid-template-columns:1fr;max-width:640px;padding-bottom:30px"><main>
+ <div class="card">
+  <div class="lab">PromptPay number (phone or 13-digit ID) for QR payment</div><input type="text" id="pp" inputmode="numeric" placeholder="0812345678">
+  <div class="lab">Google Apps Script Web app URL (not the Google Sheet link)</div><input type="url" id="gs" placeholder="https://script.google.com/macros/s/.../exec">
+  <div class="row" style="margin-top:12px"><button class="btn" id="saveSet">Save</button><button class="btn sec" id="syncBtn">Sync unsent orders</button><button class="btn ghost" id="testBtn">Test connection</button><button class="btn ghost" id="resendBtn">Re-send all</button>
+  </div>
+  <div class="mut" id="syncInfo" style="margin-top:8px"></div>
+ </div>
+ <div class="card" style="margin-top:12px">
+  <div class="row"><button class="btn sec" id="csv">Download CSV</button><button class="btn ghost" id="clearAll" style="color:#c0392b">Clear all sales data</button></div>
+  <div class="mut" style="margin-top:8px">Clearing only affects this device. Rows already in Google Sheets stay there.</div>
+ </div>
+</main></div>
 
-    <div class="container">
-        <!-- โซนเลือกสินค้า -->
-        <div class="products-grid" id="product-list">
-            <!-- สินค้าจะถูกสร้างตรงนี้ด้วย JavaScript -->
-        </div>
+<dialog id="dlg"><h3 style="margin-top:0" id="dTitle"></h3><input type="text" id="dName" placeholder="Flavor name">
+ <div class="row" style="margin-top:14px"><button class="btn ghost" id="dNo">Cancel</button><button class="btn" id="dOk">Add flavor</button></div></dialog>
 
-        <!-- โซนตะกร้าและคิดเงิน -->
-        <div class="cart-section">
-            <h2>ตะกร้าสินค้า</h2>
-            <div class="cart-items" id="cart-items">
-                <!-- รายการในตะกร้า -->
-            </div>
-            
-            <div class="total-box">
-                <span>ยอดรวม: </span>
-                <span id="total-price" style="color:#e91e63;">0</span>
-                <span> ฿</span>
-            </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+const CATS=["Original","Premium","Signature"];
+const BASE=[["Holy Cow!","Original",6],["Thai Tea","Original","thai-tea"],["Pecan't Sleep","Premium",5],["70% Into Dark Side","Premium",1],["Weirdly Wonderful","Premium",4],["Chocolate with Cherry Jam","Premium",1],["Nutting to Prove","Signature","nutting"],["Matcha Snob","Signature",2]].map(([n,c,i])=>({n,c,i}));
+const PRICE={g1:{Original:79,Premium:89,Signature:99},g2:{Original:40,Premium:45,Signature:50},aff:{Original:79,Premium:84,Signature:89}};
+const AFFOGATO_PRICE={Original:79,Premium:84,Signature:89};
+const $=id=>document.getElementById(id),baht=n=>"฿"+Math.round(n).toLocaleString();
+const h=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Object.entries(a)){if(x==="text")e.textContent=v;else if(x.startsWith("on"))e[x]=v;else e.setAttribute(x,v)}e.append(...k);return e};
+const ls=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const q=new URLSearchParams(location.search),qs=(k)=>q.get(k) || "";
+const startupCfg={pp:qs("pp"),gs:qs("gs")};
+let custom=ls("refv_custom",[]),orders=ls("refv_orders",[]),cfg=ls("refv_cfg",{pp:startupCfg.pp,gs:startupCfg.gs});
+if(startupCfg.pp)cfg.pp=startupCfg.pp;if(startupCfg.gs)cfg.gs=startupCfg.gs;sv("refv_cfg",cfg);
+const validGS=u=>/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/)?macros\/s\/[\w-]+\/exec/.test(u);
+orders=orders.filter(o=>!o.sample);if(cfg.gs&&!validGS(cfg.gs))orders.forEach(o=>o.synced=0);sv("refv_orders",orders);
 
-            <button class="btn-checkout" onclick="generateQR()">💳 ชำระเงิน (สร้าง QR)</button>
-            <button class="btn-clear" onclick="clearCart()">🗑️ ล้างตะกร้า</button>
-            
-            <div id="qr-display"></div>
-        </div>
-    </div>
+async function loadProjectConfig(){
+  try {
+    const r = await fetch('./config.json?ts=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const data = await r.json();
+    const project = {
+      pp: typeof data.pp === 'string' ? data.pp.trim() : '',
+      gs: typeof data.gs === 'string' ? data.gs.trim() : ''
+    };
+    if (!cfg.pp && project.pp) cfg.pp = project.pp;
+    if (!cfg.gs && project.gs) cfg.gs = project.gs;
+    if ((project.pp && !cfg.pp) || (project.gs && !cfg.gs)) sv('refv_cfg', cfg);
+    if (cfg.pp || cfg.gs) renderSettings();
+  } catch (e) {}
+}
 
-    <script>
-        // --- 1. ตั้งค่าเบอร์พร้อมเพย์ของคุณที่นี่ (เปลี่ยนจาก 0812345678 เป็นเบอร์ของคุณ) ---
-        const PROMPTPAY_NUMBER = "0812345678"; 
+function mergeOrders(localList=[], sharedList=[]){
+  const all = [...(Array.isArray(localList)?localList:[]), ...(Array.isArray(sharedList)?sharedList:[])];
+  const map = new Map();
+  for (const o of all) {
+    const key = String(o && o.id ? o.id : '').trim();
+    if (!key) continue;
+    const prev = map.get(key);
+    const candidate = {
+      ...(prev || {}),
+      ...(o || {}),
+      items: Array.isArray(o && o.items) ? o.items : (prev && Array.isArray(prev.items) ? prev.items : []),
+      synced: Number(o && o.synced) === 1 || (prev && Number(prev.synced) === 1) ? 1 : 0,
+      ts: Number(o && o.ts) || Number(prev && prev.ts) || Date.now()
+    };
+    if (!prev || Number(candidate.ts) >= Number(prev.ts || 0)) map.set(key, candidate);
+  }
+  return Array.from(map.values()).sort((a,b)=>(Number(a.ts)||0)-(Number(b.ts)||0));
+}
+let S={type:"gelato",cups:1,picks:[]},cart=[],pay="cash",recv=0,period="7",pendingCat=null;
+const modeOf=(t,c)=>t==="affogato"?"aff":c===2?"g2":"g1",need=()=>S.type==="gelato"&&S.cups===2?2:1;
+const mkItem=(type,cups,drink,picks)=>{
+ const m = type === "affogato" ? AFFOGATO_PRICE : PRICE[modeOf(type,cups)];
+ const parts = picks.map(p => ({name:p.n,cat:p.c,price:m[p.c]}));
+ return {type,cups:type==="gelato"?cups:1,drink:type==="affogato"?"Espresso":"",parts,price:parts.reduce((s,p)=>s+p.price,0)};
+};
+const desc=i=>(i.type==="affogato"?"Affogato":`Gelato ×${i.cups}`)+": "+i.parts.map(p=>p.name).join(" + ");
+const allFlavors=()=>[...BASE,...custom.map(x=>({...x,x:1}))];
 
-        // --- 2. เพิ่ม/ลด รายการสินค้าของคุณที่นี่ ---
-        const products = [
-            { id: 'p1', name: 'กาแฟเย็น', price: 50 },
-            { id: 'p2', name: 'ชาเขียว', price: 60 },
-            { id: 'p3', name: 'ชานมไข่มุก', price: 55 },
-            { id: 'p4', name: 'เค้กส้ม', price: 85 },
-            { id: 'p5', name: 'ครัวซองต์', price: 65 },
-            { id: 'p6', name: 'น้ำเปล่า', price: 15 }
-        ];
+/* ---------- tabs ---------- */
+function showTab(t){["sell","report","settings"].forEach(k=>$(k).classList.toggle("hide",k!==t));
+ [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.t===t));if(t==="report")renderReport();if(t==="settings")renderSettings()}
+[["sell","Sell"],["report","Report"],["settings","Settings"]].forEach(([k,l])=>{const b=h("button",{text:l,onclick:()=>showTab(k)});b.dataset.t=k;$("tabs").append(b)});
 
-        let cart = {};
+/* ---------- sell ---------- */
+function seg(box,items,cur,fn){box.innerHTML="";items.forEach(([v,l])=>box.append(h("button",{text:l,class:v===cur?"on":"",onclick:()=>fn(v)})))}
+function renderSell(){
+ seg($("types"),[["gelato","🍨 Gelato"],["affogato","☕ Affogato"]],S.type,v=>{S.type=v;S.picks=S.picks.slice(0,need());renderSell()});
+ $("cupsBox").classList.toggle("hide",S.type!=="gelato");
+ seg($("cups"),[[1,"1 flavor"],[2,"2 flavors"]],S.cups,v=>{S.cups=v;S.picks=S.picks.slice(0,need());renderSell()});
+ const m=PRICE[modeOf(S.type,S.cups)],n=need(),menu=$("menu");menu.innerHTML="";
+ CATS.forEach(cat=>{
+  menu.append(h("div",{class:"cat"},h("b",{text:cat}),h("span",{text:baht(m[cat])+(n===2?" / scoop":"")})));
+  const g=h("div",{class:"grid"});
+  allFlavors().filter(f=>f.c===cat).forEach(f=>{
+   const idx=S.picks.findIndex(p=>p.n===f.n);
+   const b=h("button",{class:"fl"+(idx>=0?" on":""),onclick:()=>{if(idx>=0)S.picks.splice(idx,1);else{if(S.picks.length>=n)S.picks.shift();S.picks.push(f)}renderSell()}},
+    h("img",{src:`images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`,alt:f.n,loading:"lazy"}),h("div",{class:"t"},h("b",{text:f.n}),h("span",{class:"chip",text:baht(m[cat])})));
+   if(idx>=0&&n===2)b.append(h("div",{class:"n",text:idx+1}));
+   if(f.x){const w=h("div",{style:"position:relative"},b,h("button",{class:"x",text:"✕",title:"Remove flavor",onclick:()=>{if(confirm(`Remove "${f.n}"?`)){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom);S.picks=S.picks.filter(p=>p.n!==f.n);renderSell()}}}));g.append(w)}else g.append(b)});
+  g.append(h("button",{class:"fl new",onclick:()=>{pendingCat=cat;$("dTitle").textContent=`New ${cat} flavor`;$("dName").value="";$("dlg").showModal()}},h("div",{text:"＋ New flavor"})));
+  menu.append(g)});
+ const it=S.picks.length?mkItem(S.type,S.cups,S.drink,S.picks):null;
+ $("slots").innerHTML="";$("slots").append(S.picks.length?h("span",{},h("b",{text:S.picks.map(p=>p.n).join(" + ")}),` · ${S.picks.length}/${n}`):`Pick ${n} flavor${n>1?"s":""}`);
+ $("addBtn").textContent=it&&S.picks.length===n?`Add ${baht(it.price)}`:"Add";$("addBtn").disabled=S.picks.length!==n;
+}
+$("addBtn").onclick=()=>{cart.push(mkItem(S.type,S.cups,S.drink,S.picks));S.picks=[];renderSell();renderCart()};
+$("dNo").onclick=()=>$("dlg").close();
+$("dOk").onclick=()=>{const v=$("dName").value.trim();if(!v)return;if(allFlavors().some(f=>f.n.toLowerCase()===v.toLowerCase())){alert("This flavor already exists");return}
+ custom.push({n:v,c:pendingCat,i:"g6"});sv("refv_custom",custom);$("dlg").close();renderSell()};
+$("dName").onkeydown=e=>{if(e.key==="Enter")$("dOk").click()};
 
-        // ฟังก์ชันสร้างปุ่มสินค้าลงบนหน้าเว็บ
-        function renderProducts() {
-            const productList = document.getElementById('product-list');
-            products.forEach(p => {
-                const card = document.createElement('div');
-                card.className = 'product-card';
-                card.onclick = () => addToCart(p.id, p.name, p.price);
-                card.innerHTML = `
-                    <div class="product-name">${p.name}</div>
-                    <div class="product-price">${p.price} ฿</div>
-                `;
-                productList.appendChild(card);
-            });
-        }
+const toast=(m,c)=>{const t=h("div",{class:"toast",text:m});if(c)t.style.background=c;document.body.append(t);setTimeout(()=>t.remove(),4000)};
+/* ---------- cart & payment ---------- */
+const cartTotal=()=>cart.reduce((s,i)=>s+i.price,0);
+function ppPayload(id,amt){id=id.replace(/\D/g,"");const f=(t,v)=>t+String(v.length).padStart(2,"0")+v;
+ const acc=id.length>=13?f("02",id):f("01","0066"+id.replace(/^0/,""));
+ let p=f("00","01")+f("01","12")+f("29",f("00","A000000677010111")+acc)+f("58","TH")+f("53","764")+f("54",amt.toFixed(2))+"6304",c=0xFFFF;
+ for(let i=0;i<p.length;i++){c^=p.charCodeAt(i)<<8;for(let j=0;j<8;j++)c=c&0x8000?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF}
+ return p+c.toString(16).toUpperCase().padStart(4,"0")}
+function renderCart(){
+ const L=$("lines");L.innerHTML="";const t=cartTotal();
+ if(!cart.length)L.append(h("div",{class:"mut",text:"No items yet. Pick flavors and tap Add.",style:"padding:12px 0"}));
+ cart.forEach((it,i)=>L.append(h("div",{class:"line"},h("div",{},h("b",{text:desc(it)})),h("div",{style:"white-space:nowrap"},baht(it.price)+" ",h("button",{text:"✕",class:"x",style:"position:static;display:inline-block;vertical-align:middle",onclick:()=>{cart.splice(i,1);renderCart()}})))));
+ $("total").textContent=baht(t);$("cartBtn").textContent=cart.length?`🛒 View order · ${cart.length} item${cart.length>1?"s":""} · ${baht(t)}`:"🛒 Order is empty";
+ $("payCash").className=pay==="cash"?"on":"";$("payQR").className=pay==="qr"?"on":"";
+ $("cashBox").classList.toggle("hide",pay!=="cash");$("qrBox").classList.toggle("hide",pay!=="qr");
+ if(pay==="cash"){recv=t;$("recv").value=recv;
+  $("quick").innerHTML="";[["Exact",t],["฿100",100],["฿500",500],["฿1000",1000]].forEach(([l,v])=>$("quick").append(h("button",{class:"btn sec",text:l,onclick:()=>{recv=v;$("recv").value=v;upd()}})))}
+ else{$("qrImg").innerHTML="";if(cfg.pp&&t>0&&window.qrcode){try{const q=qrcode(0,"M");q.addData(ppPayload(cfg.pp,t));q.make();$("qrImg").innerHTML=q.createSvgTag({cellSize:4,margin:2,scalable:true});$("qrTxt").textContent=`Scan to pay ${baht(t)} via PromptPay`}catch(e){$("qrTxt").textContent="Could not build QR"}}
+  else $("qrTxt").textContent=!cfg.pp?"Set your PromptPay number in Settings":!t?"Add items first":"QR library not loaded (needs internet)"}
+ upd();
+}
+function upd(){const t=cartTotal();recv=+$("recv").value||0;const ch=recv-t;$("change").textContent=pay==="cash"?(ch>=0?baht(ch):"short "+baht(-ch)):"";
+ $("confirm").disabled=!cart.length||(pay==="cash"&&recv<t)||(pay==="qr"&&!cfg.pp)}
+$("recv").oninput=upd;
+$("payCash").onclick=()=>{pay="cash";recv=0;renderCart()};$("payQR").onclick=()=>{pay="qr";renderCart()};
+$("clearCart").onclick=()=>{cart=[];recv=0;renderCart()};
+$("cartBtn").onclick=()=>$("cart").classList.add("open");$("closeCart").onclick=()=>$("cart").classList.remove("open");
+const dkey=ts=>new Date(ts).toLocaleDateString("en-CA");
+$("confirm").onclick=()=>{
+ const now=Date.now(),n=orders.filter(o=>dkey(o.ts)===dkey(now)).length+1;
+ const o={id:dkey(now).replace(/-/g,"").slice(2)+"-"+String(n).padStart(3,"0"),ts:now,items:cart,total:cartTotal(),pay,recv:pay==="cash"?recv:cartTotal(),synced:0};
+ orders.push(o);sv("refv_orders",orders);
+ const change=o.recv-o.total;cart=[];recv=0;$("cart").classList.remove("open");renderCart();
+ toast(`Order ${o.id} done · ${baht(o.total)}${o.pay==="cash"&&change>0?" · change "+baht(change):""}`);
+ send([o]).then(ok=>{if(cfg.gs&&!ok)toast("Saved here, but NOT sent to Google Sheets. See Settings.","#d9822b")})};
 
-        // ฟังก์ชันเพิ่มสินค้าลงตะกร้า
-        function addToCart(id, name, price) {
-            if (cart[id]) {
-                cart[id].qty++;
-            } else {
-                cart[id] = { name: name, price: price, qty: 1 };
-            }
-            updateCartUI();
-        }
+/* ---------- Google Sheets / CSV ---------- */
+const HEAD=["Order ID","Date","Time","Type","Flavors per cup","Flavor 1","Flavor 2","Category 1","Category 2","Payment","Amount (THB)"];
+const rowsOf=o=>o.items.map(i=>{const d=new Date(o.ts);return[o.id,dkey(o.ts),d.toLocaleTimeString("en-GB"),i.type,i.cups,i.parts[0].name,i.parts[1]?.name||"",i.parts[0].cat,i.parts[1]?.cat||"",o.pay==="qr"?"QR":"Cash",i.price]});
+let lastSync="";
+async function send(list){
+ if(!cfg.gs)return true;
+ if(!validGS(cfg.gs)){lastSync="Invalid URL: use the Apps Script Web app URL (starts with https://script.google.com/macros/s/ and ends with /exec), not the Google Sheet link.";renderSettings();return false}
+ const rows=list.flatMap(rowsOf);if(!rows.length)return true;
+ const body=JSON.stringify({head:HEAD,rows});let ok=false;
+ try{const r=await fetch(cfg.gs,{method:"POST",headers:{"Content-Type":"text/plain"},body});const t=(await r.text()).trim();
+  if(t.startsWith("ok")){ok=true;lastSync="Last sync OK at "+new Date().toLocaleTimeString("en-GB")}
+  else lastSync="Google replied with an error. Check the deployment: Execute as Me, access Anyone. "+t.replace(/<[^>]*>/g," ").slice(0,100)}
+ catch(e){try{await fetch(cfg.gs,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},body});ok=true;lastSync="Sent, but this browser could not confirm it. Please check your sheet."}catch(e2){lastSync="Could not reach Google (offline?). Will retry."}}
+ if(ok){list.forEach(o=>o.synced=1);sv("refv_orders",orders)}
+ renderSettings();return ok}
+const csvText=()=>[HEAD,...orders.flatMap(rowsOf)].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+$("csv").onclick=()=>{const a=h("a",{href:URL.createObjectURL(new Blob(["\ufeff"+csvText()],{type:"text/csv"})),download:`refv-sales-${dkey(Date.now())}.csv`});document.body.append(a);a.click();a.remove()};
+async function loadCentralConfig(){
+  if(!cfg.gs||!validGS(cfg.gs)) return;
+  const url = cfg.gs + (cfg.gs.includes('?') ? '&' : '?') + 'mode=config';
+  try {
+    const r = await fetch(url,{cache:'no-store'});
+    if(!r.ok) return;
+    const data = await r.json();
+    if(data && typeof data.pp === 'string' && data.pp.trim()) {
+      cfg.pp = data.pp.trim();
+      sv('refv_cfg', cfg);
+      renderSettings();
+    }
+  } catch(e) {}
+}
 
-        // ฟังก์ชันอัปเดตหน้าจอหลัก (คำนวณเงิน)
-        function updateCartUI() {
-            const cartItemsDiv = document.getElementById('cart-items');
-            cartItemsDiv.innerHTML = '';
-            let total = 0;
+async function loadCentralReport(){
+  if(!cfg.gs||!validGS(cfg.gs)) return [];
+  const url = cfg.gs + (cfg.gs.includes('?') ? '&' : '?') + 'mode=report';
+  try {
+    const r = await fetch(url,{cache:'no-store'});
+    if(!r.ok) return [];
+    const data = await r.json();
+    return Array.isArray(data.sales) ? data.sales : [];
+  } catch(e) {
+    return [];
+  }
+}
 
-            for (let id in cart) {
-                const item = cart[id];
-                const itemTotal = item.price * item.qty;
-                total += itemTotal;
+async function refreshSharedState(){
+  if(!cfg.gs||!validGS(cfg.gs)) return;
+  await loadCentralConfig();
+  const sharedOrders = await loadCentralReport();
+  orders = mergeOrders(orders, sharedOrders);
+  sv('refv_orders', orders);
+  renderSettings();
+  if (typeof renderReport === 'function') renderReport();
+}
 
-                cartItemsDiv.innerHTML += `
-                    <div class="cart-item">
-                        <span>${item.name} (x${item.qty})</span>
-                        <span>${itemTotal} ฿</span>
-                    </div>
-                `;
-            }
-            document.getElementById('total-price').innerText = total;
-        }
+function renderSettings(){
+ const ppEl=$("pp"),gsEl=$("gs");
+ if(ppEl) ppEl.value=cfg.pp || "";
+ if(gsEl) gsEl.value=cfg.gs || "";
+ const u=orders.filter(o=>!o.synced).length;
+ $("syncInfo").textContent=(cfg.gs?`${u} order(s) not yet sent to Google Sheets. `:"Add the Web app URL to send each order to Google Sheets automatically. ")+lastSync}
+$("saveSet").onclick=async()=>{const gsEl=$("gs"),ppEl=$("pp");const g=(gsEl?gsEl.value:" ").trim();if(g&&!validGS(g)){alert("This is not a Web app URL.\nIt must start with https://script.google.com/macros/s/ and end with /exec.\nDo not paste the Google Sheet link.");return}
+ cfg={pp:(ppEl?ppEl.value:" ").trim(),gs:g};sv("refv_cfg",cfg);renderCart();renderSettings();
+ if(g){
+  try {
+   await fetch(g,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'config',pp:cfg.pp})});
+  } catch(e) {}
+  await refreshSharedState();
+  await send(orders.filter(o=>!o.synced));
+ }
+ alert("Saved")};
+$("syncBtn").onclick=async()=>{const gsEl=$("gs");cfg.gs=(gsEl?gsEl.value:" ").trim();await send(orders.filter(o=>!o.synced))};
+$("resendBtn").onclick=async()=>{const gsEl=$("gs");cfg.gs=(gsEl?gsEl.value:" ").trim();await send(orders)};
+$("testBtn").onclick=async()=>{const gsEl=$("gs"),i=$("syncInfo");const u=(gsEl?gsEl.value:" ").trim();if(!validGS(u)){i.textContent="This is not a Web app URL. It must start with https://script.google.com/macros/s/ and end with /exec.";return}
+ i.textContent="Testing...";try{const t=await(await fetch(u)).text();i.textContent=t.includes("REFV POS ready")?"Connected to your Google Sheet script.":"Reached Google, but this is not the latest REFV script. Paste the new apps-script.gs, then Deploy > Manage deployments > Edit > New version."}catch(e){i.textContent="No readable reply. Make sure Who has access = Anyone and the script is deployed as a Web app."}};
+$("clearAll").onclick=()=>{if(!orders.length){alert("There is no sales data on this device.");return}
+ if(confirm(`Delete all ${orders.length} orders from this device?\nDownload the CSV first if you need them. This cannot be undone.\n(Rows already in Google Sheets are not deleted.)`)){orders=[];sv("refv_orders",orders);renderSettings();alert("Sales data cleared.")}};
 
-        // ฟังก์ชันสร้าง QR Code
-        function generateQR() {
-            const total = parseFloat(document.getElementById('total-price').innerText);
-            if (total === 0) {
-                alert("กรุณาเลือกสินค้าก่อนชำระเงิน!");
-                return;
-            }
-            
-            // ดึง API จาก promptpay.io
-            const qrUrl = `https://promptpay.io/${PROMPTPAY_NUMBER}/${total}.png`;
-            document.getElementById('qr-display').innerHTML = `
-                <p style="margin-bottom: 5px;">สแกนเพื่อจ่าย <b>${total}</b> บาท</p>
-                <img src="${qrUrl}" alt="PromptPay QR Code">
-            `;
-        }
-
-        // ฟังก์ชันล้างตะกร้า
-        function clearCart() {
-            cart = {};
-            updateCartUI();
-            document.getElementById('qr-display').innerHTML = '';
-        }
-
-        // สั่งให้ระบบวาดสินค้าตอนเปิดเว็บครั้งแรก
-        window.onload = renderProducts;
-    </script>
-</body>
-</html>
+/* ---------- report ---------- */
+function vcols(list){const mx=Math.max(1,...list.map(x=>x.v)),w=h("div",{class:"vc"});list.forEach((x,i)=>w.append(h("div",{class:x.hi?"hi":"",title:`${x.l}: ${baht(x.v)}`},h("i",{style:`height:${x.v/mx*100}%`}),h("span",{text:list.length<=8||i%5===0||x.hi?x.l:""}))));return w}
+function hbars(list,fmt=baht){const mx=Math.max(1,...list.map(x=>x.v)),w=h("div");if(!list.length)w.append(h("div",{class:"mut",text:"No data"}));list.forEach((x,i)=>w.append(h("div",{class:"hb"+(i===0?" hi":"")},h("span",{text:x.l}),h("em",{style:`width:${Math.max(3,x.v/mx*100)}%`}),h("span",{text:fmt(x.v)+(x.s?` · ${x.s}`:"")}))));return w}
+async function renderReport(){
+ seg($("period"),[["1","Today"],["7","7 days"],["30","30 days"],["all","All"]],period,v=>{period=v;renderReport()});
+ const sharedOrders = await loadCentralReport();
+ const sourceOrders = mergeOrders(orders, sharedOrders).filter(o => !o.sample);
+ const t0=new Date();t0.setHours(0,0,0,0);const from=period==="all"?0:t0.getTime()-(+period-1)*864e5;
+ const os=sourceOrders.filter(o=>o.ts>=from),rev=os.reduce((s,o)=>s+o.total,0),cups=os.reduce((s,o)=>s+o.items.length,0);
+ const sum=(f)=>{const m={};os.forEach(o=>f(o,(k,v,c=0)=>{m[k]=m[k]||{v:0,c:0};m[k].v+=v;m[k].c+=c}));return Object.entries(m).map(([l,x])=>({l,v:x.v,c:x.c})).sort((a,b)=>b.v-a.v)};
+ const pay=sum((o,a)=>a(o.pay==="qr"?"QR":"Cash",o.total,1)),cat=sum((o,a)=>o.items.forEach(i=>i.parts.forEach(p=>a(p.cat,p.price,1))));
+ const typ=sum((o,a)=>o.items.forEach(i=>a(i.type==="affogato"?"Affogato":`Gelato ${i.cups} flavor${i.cups>1?"s":""}`,i.price,1)));
+ const fl=sum((o,a)=>o.items.forEach(i=>i.parts.forEach(p=>a(p.name,p.price,1)))).sort((a,b)=>b.c-a.c||b.v-a.v);
+ const wd=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((l,i)=>({l,v:0,i}));os.forEach(o=>wd[new Date(o.ts).getDay()].v+=o.total);
+ const days=period==="30"||period==="all"?30:7,dl=[];for(let d=days-1;d>=0;d--){const x=new Date(t0);x.setDate(x.getDate()-d);const k=dkey(x);dl.push({l:x.getDate()+"/"+(x.getMonth()+1),v:sourceOrders.filter(o=>dkey(o.ts)===k).reduce((s,o)=>s+o.total,0)})}
+ const bd=dl.reduce((a,b)=>b.v>a.v?b:a,dl[0]);bd.hi=bd.v>0;const bw=[...wd].sort((a,b)=>b.v-a.v)[0];if(bw.v>0)wd.find(x=>x.l===bw.l).hi=true;
+ $("kpis").innerHTML="";[["Revenue",baht(rev)],["Orders",os.length],["Avg per order",baht(os.length?rev/os.length:0)]].forEach(([l,v])=>$("kpis").append(h("div",{class:"card kpi"},h("small",{text:l}),h("b",{text:v}))));
+ $("insight").textContent=os.length?`🏆 Best day (last ${days} days): ${bd.l} (${baht(bd.v)}). Best weekday: ${bw.l} (${baht(bw.v)}). Top flavor: ${fl[0].l} (${fl[0].c} scoops). Top category: ${cat[0].l}.`:"No sales in this period yet. Complete an order and it will show up here.";
+ const C=$("charts");C.innerHTML="";const add=(t,n)=>C.append(h("div",{class:"card"},h("h3",{text:t}),n));
+ add(`Revenue per day (last ${days} days)`,vcols(dl));add("Revenue by weekday",vcols(wd.map(x=>({l:x.l,v:x.v,hi:x.hi}))));
+ add("Top flavors (scoops sold)",hbars(fl.slice(0,8).map(x=>({l:x.l,v:x.c,s:baht(x.v)})),n=>n));
+ add("By category",hbars(cat.map(x=>({l:x.l,v:x.v,s:x.c+" scoops"}))));add("Flavors per cup / type",hbars(typ.map(x=>({l:x.l,v:x.v,s:x.c+" cups"}))));add("Payment methods",hbars(pay.map(x=>({l:x.l,v:x.v,s:x.c+" orders"}))));
+}
+renderSell();renderCart();showTab("sell");
+loadProjectConfig();
+if(cfg.gs){
+  refreshSharedState();
+  send(orders.filter(o=>!o.synced&&!o.sample));
+}
+</script></body></html>
