@@ -105,15 +105,31 @@ dialog{border:0;border-radius:var(--r);padding:20px;width:min(420px,92vw);color:
   </div>
   <div class="mut" id="syncInfo" style="margin-top:8px"></div>
  </div>
- <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Flavor photos</h3><div class="mut" style="margin-bottom:8px">Tap Add photo to pick a picture for each flavor. Saved on this device.</div><div id="photoList"></div></div>
+ <div class="card" style="margin-top:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+   <h3 style="margin:0">Flavor photos</h3>
+   <button class="btn" id="newFlavorBtn" style="padding:8px 14px;font-size:14px">＋ New flavor</button>
+  </div>
+  <div class="mut" style="margin-bottom:8px">Add new flavors and set pictures for each flavor. Saved on this device.</div>
+  <div id="photoList"></div>
+ </div>
  <div class="card" style="margin-top:12px">
   <div class="row"><button class="btn sec" id="csv">Download CSV</button><button class="btn ghost" id="clearAll" style="color:#c0392b">Clear all sales data</button></div>
   <div class="mut" style="margin-top:8px">Clearing only affects this device. Rows already in Google Sheets stay there.</div>
  </div>
 </main></div>
 
-<dialog id="dlg"><h3 style="margin-top:0" id="dTitle"></h3><input type="text" id="dName" placeholder="Flavor name">
- <div class="row" style="margin-top:14px"><button class="btn ghost" id="dNo">Cancel</button><button class="btn" id="dOk">Add flavor</button></div></dialog>
+<dialog id="dlg"><h3 style="margin-top:0" id="dTitle">New flavor</h3>
+ <div class="lab">Category</div>
+ <select id="dCat" style="width:100%;font:inherit;padding:12px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);margin-bottom:10px">
+  <option value="Original">Original (฿79 / ฿40)</option>
+  <option value="Premium">Premium (฿89 / ฿45)</option>
+  <option value="Signature">Signature (฿99 / ฿50)</option>
+ </select>
+ <div class="lab">Flavor name</div>
+ <input type="text" id="dName" placeholder="Flavor name">
+ <div class="row" style="margin-top:14px"><button class="btn ghost" id="dNo">Cancel</button><button class="btn" id="dOk">Add flavor</button></div>
+</dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
@@ -197,16 +213,17 @@ function renderSell(){
     h("img",{src:photos[f.n]||`images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`,alt:f.n,loading:"lazy"}),h("div",{class:"t"},h("b",{text:f.n}),h("span",{class:"chip",text:baht(m[cat])})));
    if(idx>=0&&n===2)b.append(h("div",{class:"n",text:idx+1}));
    g.append(b)});
-  g.append(h("button",{class:"fl new",onclick:()=>{pendingCat=cat;$("dTitle").textContent=`New ${cat} flavor`;$("dName").value="";$("dlg").showModal()}},h("div",{text:"＋ New flavor"})));
-  menu.append(g)});
+  menu.append(g);
+ });
  const it=S.picks.length?mkItem(S.type,S.cups,S.drink,S.picks):null;
  $("slots").innerHTML="";$("slots").append(S.picks.length?h("span",{},h("b",{text:S.picks.map(p=>p.n).join(" + ")}),` · ${S.picks.length}/${n}`):`Pick ${n} flavor${n>1?"s":""}`);
  $("addBtn").textContent=it&&S.picks.length===n?`Add ${baht(it.price)}`:"Add";$("addBtn").disabled=S.picks.length!==n;
 }
 $("addBtn").onclick=()=>{cart.push(mkItem(S.type,S.cups,S.drink,S.picks));S.picks=[];renderSell();renderCart()};
 $("dNo").onclick=()=>$("dlg").close();
-$("dOk").onclick=()=>{const v=$("dName").value.trim();if(!v)return;if(allFlavors().some(f=>f.n.toLowerCase()===v.toLowerCase())){alert("This flavor already exists");return}
- custom.push({n:v,c:pendingCat,i:"g6"});sv("refv_custom",custom);$("dlg").close();renderSell()};
+$("dOk").onclick=()=>{const v=$("dName").value.trim(),cat=$("dCat")?$("dCat").value:"Original";if(!v)return;if(allFlavors().some(f=>f.n.toLowerCase()===v.toLowerCase())){alert("This flavor already exists");return}
+ custom.push({n:v,c:cat,i:"g6"});sv("refv_custom",custom);$("dlg").close();renderPhotos();renderSell()};
+if($("newFlavorBtn"))$("newFlavorBtn").onclick=()=>{$("dName").value="";if($("dCat"))$("dCat").value="Original";$("dlg").showModal()};
 $("dName").onkeydown=e=>{if(e.key==="Enter")$("dOk").click()};
 
 const toast=(m,c)=>{const t=h("div",{class:"toast",text:m});if(c)t.style.background=c;document.body.append(t);setTimeout(()=>t.remove(),4000)};
