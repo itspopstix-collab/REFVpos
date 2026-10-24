@@ -196,7 +196,7 @@ function renderSell(){
    const b=h("button",{class:"fl"+(idx>=0?" on":""),onclick:()=>{if(idx>=0)S.picks.splice(idx,1);else{if(S.picks.length>=n)S.picks.shift();S.picks.push(f)}renderSell()}},
     h("img",{src:photos[f.n]||`images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`,alt:f.n,loading:"lazy"}),h("div",{class:"t"},h("b",{text:f.n}),h("span",{class:"chip",text:baht(m[cat])})));
    if(idx>=0&&n===2)b.append(h("div",{class:"n",text:idx+1}));
-   if(f.x){const w=h("div",{style:"position:relative"},b,h("button",{class:"x",text:"✕",title:"Remove flavor",onclick:()=>{if(confirm(`Remove "${f.n}"?`)){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom);S.picks=S.picks.filter(p=>p.n!==f.n);renderSell()}}}));g.append(w)}else g.append(b)});
+   g.append(b)});
   g.append(h("button",{class:"fl new",onclick:()=>{pendingCat=cat;$("dTitle").textContent=`New ${cat} flavor`;$("dName").value="";$("dlg").showModal()}},h("div",{text:"＋ New flavor"})));
   menu.append(g)});
  const it=S.picks.length?mkItem(S.type,S.cups,S.drink,S.picks):null;
