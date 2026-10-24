@@ -166,7 +166,7 @@ function mergeOrders(localList=[], sharedList=[]){
   }
   return Array.from(map.values()).sort((a,b)=>(Number(a.ts)||0)-(Number(b.ts)||0));
 }
-let S={type:"gelato",cups:1,picks:[]},cart=[],pay="cash",recv=0,period="7",pendingCat=null;
+let S={type:"gelato",cups:1,picks:[]},cart=[],pay="qr",recv=0,period="7",pendingCat=null;
 const modeOf=(t,c)=>t==="affogato"?"aff":c===2?"g2":"g1",need=()=>S.type==="gelato"&&S.cups===2?2:1;
 const mkItem=(type,cups,drink,picks)=>{
  const m = type === "affogato" ? AFFOGATO_PRICE : PRICE[modeOf(type,cups)];
@@ -234,14 +234,14 @@ function upd(){const t=cartTotal();recv=+$("recv").value||0;const ch=recv-t;$("c
  $("confirm").disabled=!cart.length||(pay==="cash"&&recv<t)||(pay==="qr"&&!cfg.pp)}
 $("recv").oninput=upd;
 $("payCash").onclick=()=>{pay="cash";recv=0;renderCart()};$("payQR").onclick=()=>{pay="qr";renderCart()};
-$("clearCart").onclick=()=>{cart=[];recv=0;renderCart()};
+$("clearCart").onclick=()=>{cart=[];pay="qr";recv=0;renderCart()};
 $("cartBtn").onclick=()=>$("cart").classList.add("open");$("closeCart").onclick=()=>$("cart").classList.remove("open");
 const dkey=ts=>new Date(ts).toLocaleDateString("en-CA");
 $("confirm").onclick=()=>{
  const now=Date.now(),n=orders.filter(o=>dkey(o.ts)===dkey(now)).length+1;
  const o={id:dkey(now).replace(/-/g,"").slice(2)+"-"+String(n).padStart(3,"0"),ts:now,items:cart,total:cartTotal(),pay,recv:pay==="cash"?recv:cartTotal(),synced:0};
  orders.push(o);sv("refv_orders",orders);
- const change=o.recv-o.total;cart=[];recv=0;$("cart").classList.remove("open");renderCart();
+ const change=o.recv-o.total;cart=[];pay="qr";recv=0;$("cart").classList.remove("open");renderCart();
  toast(`Order ${o.id} done · ${baht(o.total)}${o.pay==="cash"&&change>0?" · change "+baht(change):""}`);
  send([o]).then(ok=>{if(cfg.gs&&!ok)toast("Saved here, but NOT sent to Google Sheets. See Settings.","#d9822b")})};
 
