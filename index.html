@@ -224,6 +224,11 @@ const allFlavors=()=>{
   custom.forEach(f=>{if(!hidden.includes(f.n))map.set(f.n,{...f,x:1})});
   return Array.from(map.values());
 };
+function flavorImg(f){
+  if(photos&&photos[f.n])return photos[f.n];
+  if(f&&f.i&&typeof f.i==="string"&&(f.i.startsWith("http")||f.i.startsWith("data:")||f.i.startsWith("blob:")))return f.i;
+  return `images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`;
+}
 
 /* ---------- tabs ---------- */
 function showTab(t){["sell","report","settings"].forEach(k=>$(k).classList.toggle("hide",k!==t));
@@ -243,7 +248,7 @@ function renderSell(){
   allFlavors().filter(f=>f.c===cat).forEach(f=>{
    const idx=S.picks.findIndex(p=>p.n===f.n);
    const b=h("button",{class:"fl"+(idx>=0?" on":""),onclick:()=>{if(idx>=0)S.picks.splice(idx,1);else{if(S.picks.length>=n)S.picks.shift();S.picks.push(f)}renderSell()}},
-    h("img",{src:photos[f.n]||`images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`,alt:f.n,loading:"lazy"}),h("div",{class:"t"},h("b",{text:f.n}),h("span",{class:"chip",text:baht(m[cat])})));
+    h("img",{src:flavorImg(f),alt:f.n,loading:"lazy",onerror:(e)=>{e.target.style.opacity="0.25"}}),h("div",{class:"t"},h("b",{text:f.n}),h("span",{class:"chip",text:baht(m[cat])})));
    if(idx>=0&&n===2)b.append(h("div",{class:"n",text:idx+1}));
    g.append(b)});
   menu.append(g);
@@ -423,13 +428,13 @@ async function refreshSharedState(){
   if (typeof renderReport === 'function') renderReport();
 }
 
-function resizePhoto(file){return new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{const s=480/Math.max(im.width,im.height,480),w=Math.round(im.width*Math.min(1,s)),hh=Math.round(im.height*Math.min(1,s)),c=document.createElement("canvas");c.width=w;c.height=hh;c.getContext("2d").drawImage(im,0,0,w,hh);res(c.toDataURL("image/jpeg",.8))};im.src=r.result};r.readAsDataURL(file)})}
+function resizePhoto(file){return new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{const s=360/Math.max(im.width,im.height,360),w=Math.round(im.width*Math.min(1,s)),hh=Math.round(im.height*Math.min(1,s)),c=document.createElement("canvas");c.width=w;c.height=hh;c.getContext("2d").drawImage(im,0,0,w,hh);res(c.toDataURL("image/jpeg",.75))};im.src=r.result};r.readAsDataURL(file)})}
 function renderPhotos(){const L=$("photoList");if(!L)return;L.innerHTML="";
   allFlavors().forEach(f=>{const inp=h("input",{type:"file",accept:"image/*",class:"hide"});
    inp.onchange=async()=>{const file=inp.files[0];if(!file)return;try{photos[f.n]=await resizePhoto(file);sv("refv_photos",photos);renderPhotos();renderSell()}catch(e){delete photos[f.n];alert("Could not process this photo.")}};
-   const src=photos[f.n]||`images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`;
+   const src=flavorImg(f);
    L.append(h("div",{style:"display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line)"},
-    h("img",{src,alt:f.n,style:"width:56px;height:56px;border-radius:12px;object-fit:cover;background:var(--sky)"}),
+    h("img",{src,alt:f.n,style:"width:56px;height:56px;border-radius:12px;object-fit:cover;background:var(--sky)",onerror:(e)=>{e.target.style.opacity="0.25"}}),
     h("div",{style:"flex:1;min-width:0"},h("b",{text:f.n}),h("div",{class:"mut",text:f.c})),
     inp,h("button",{class:"btn sec",text:photos[f.n]?"Change":"Add photo",style:"padding:10px 14px",onclick:()=>inp.click()}),
     h("button",{class:"btn ghost",text:"✕",title:"Remove flavor",style:"padding:10px 12px",onclick:()=>{if(!confirm(`Remove "${f.n}"?`))return;delete photos[f.n];sv("refv_photos",photos);if(f.x){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom)}else{hidden.push(f.n);sv("refv_hidden",hidden)}S.picks=S.picks.filter(p=>p.n!==f.n);renderPhotos();renderSell();if(cfg.gs&&validGS(cfg.gs)){fetch(cfg.gs,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'delete_flavor',n:f.n})}).then(()=>loadCentralFlavors()).catch(()=>{})}}})))});
@@ -481,8 +486,14 @@ async function renderReport(){
  add("Top flavors (scoops sold)",hbars(fl.slice(0,8).map(x=>({l:x.l,v:x.c,s:baht(x.v)})),n=>n));
  add("By category",hbars(cat.map(x=>({l:x.l,v:x.v,s:x.c+" scoops"}))));add("Flavors per cup / type",hbars(typ.map(x=>({l:x.l,v:x.v,s:x.c+" cups"}))));add("Payment methods",hbars(pay.map(x=>({l:x.l,v:x.v,s:x.c+" orders"}))));
 }
-renderSell();renderCart();showTab("sell");
-syncFromIDB();
-loadCentralFlavors();
-loadProjectConfig().then(()=>{loadCentralFlavors();if(cfg.gs){refreshSharedState();send(orders.filter(o=>!o.synced&&!o.sample))}});
+(async function init(){
+  await syncFromIDB();
+  renderSell();renderCart();showTab("sell");
+  try{ await loadProjectConfig(); }catch(e){}
+  await loadCentralFlavors();
+  if(cfg.gs&&validGS(cfg.gs)){
+    refreshSharedState();
+    send(orders.filter(o=>!o.synced&&!o.sample));
+  }
+})();
 </script></body></html>
