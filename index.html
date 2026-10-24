@@ -134,7 +134,16 @@ dialog{border:0;border-radius:var(--r);padding:20px;width:min(420px,92vw);color:
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 const CATS=["Original","Premium","Signature"];
-const BASE=[["Holy Cow!","Original",6],["Thai Tea","Original","thai-tea"],["Pecan't Sleep","Premium",5],["70% Into Dark Side","Premium",1],["Weirdly Wonderful","Premium",4],["Nutting to Prove","Signature","nutting"],["Matcha Snob","Signature",2]].map(([n,c,i])=>({n,c,i}));
+const BASE=[
+  ["Holy Cow!","Original","images/holy-cow.png"],
+  ["Thai Tea","Original","images/thai-tea.png"],
+  ["Pecan't Sleep","Premium","images/pecan-sleep.png"],
+  ["70% Into Dark Side","Premium","images/dark-side.png"],
+  ["Weirdly Wonderful","Premium","images/weirdly-wonderful.png"],
+  ["Grapest of All Time","Premium","images/grapest.png"],
+  ["Nutting to Prove","Signature","images/nutting.png"],
+  ["Matcha Snob","Signature","images/matcha-snob.png"]
+].map(([n,c,i])=>({n,c,i}));
 const PRICE={g1:{Original:79,Premium:89,Signature:99},g2:{Original:40,Premium:45,Signature:50},aff:{Original:79,Premium:84,Signature:89}};
 const AFFOGATO_PRICE={Original:79,Premium:84,Signature:89};
 const $=id=>document.getElementById(id),baht=n=>"฿"+Math.round(n).toLocaleString();
@@ -216,14 +225,17 @@ const allFlavors=()=>{
 };
 function flavorImg(f){
   if(photos&&photos[f.n])return photos[f.n];
-  if(f&&f.i&&typeof f.i==="string"){
-    const url=f.i.trim();
-    if(url.includes("drive.google.com")){
-      const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/)||url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      if(m&&m[1])return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w600`;
-    }
-    if(url.startsWith("http")||url.startsWith("data:")||url.startsWith("blob:"))return url;
+  const b=BASE.find(x=>x.n.toLowerCase()===f.n.toLowerCase());
+  let url=(f&&f.i&&typeof f.i==="string")?f.i.trim():"";
+  if(!url||url==="g6"||url.startsWith("images/g")||url.startsWith("images/thai")||url.startsWith("images/nutting")){
+    if(b&&b.i)url=b.i;
   }
+  if(url.includes("drive.google.com")||url.includes("googleusercontent.com")){
+    const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/)||url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if(m&&m[1])return `https://lh3.googleusercontent.com/d/${m[1]}=w600`;
+  }
+  if(url.startsWith("http")||url.startsWith("data:")||url.startsWith("blob:")||url.startsWith("images/"))return url;
+  if(b&&b.i)return b.i;
   return `images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`;
 }
 
@@ -361,7 +373,7 @@ async function loadCentralFlavors(){
                 const status=(st||'Active').trim().toLowerCase();
                 if(status==='inactive'||status==='disabled')continue;
                 const match=BASE.find(b=>b.n.toLowerCase()===n.trim().toLowerCase());
-                list.push({n:n.trim(),c:(c||'Original').trim(),i:(im||'').trim()||(match?match.i:'g6')});
+                list.push({n:n.trim(),c:(c||'Original').trim(),i:(im||'').trim()||(match?match.i:'')});
               }
               if(list.length)break;
             }
