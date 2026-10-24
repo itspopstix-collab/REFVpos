@@ -228,7 +228,7 @@ function renderSell(){
  seg($("cups"),[[1,"1 flavor"],[2,"2 flavors"]],S.cups,v=>{S.cups=v;S.picks=S.picks.slice(0,need());renderSell()});
  const m=PRICE[modeOf(S.type,S.cups)],n=need(),menu=$("menu");menu.innerHTML="";
  CATS.forEach(cat=>{
-  menu.append(h("div",{class:"cat"},h("b",{text:cat}),h("span",{text:baht(m[cat])+(n===2?" / scoop":"")})));
+  menu.append(h("div",{class:"cat"},h("b",{text:cat}),h("span",{text:baht(m[cat])+(n===2?" / half":" / scoop")})));
   const g=h("div",{class:"grid"});
   allFlavors().filter(f=>f.c===cat).forEach(f=>{
    const idx=S.picks.findIndex(p=>p.n===f.n);
