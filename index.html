@@ -216,7 +216,14 @@ const allFlavors=()=>{
 };
 function flavorImg(f){
   if(photos&&photos[f.n])return photos[f.n];
-  if(f&&f.i&&typeof f.i==="string"&&(f.i.startsWith("http")||f.i.startsWith("data:")||f.i.startsWith("blob:")))return f.i;
+  if(f&&f.i&&typeof f.i==="string"){
+    const url=f.i.trim();
+    if(url.includes("drive.google.com")){
+      const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/)||url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if(m&&m[1])return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w600`;
+    }
+    if(url.startsWith("http")||url.startsWith("data:")||url.startsWith("blob:"))return url;
+  }
   return `images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`;
 }
 
