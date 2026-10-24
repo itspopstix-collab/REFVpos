@@ -45,7 +45,7 @@ aside{display:none}aside.open{display:block;position:fixed;inset:0;background:va
 .line small{color:var(--mut);display:block}
 .tot{display:flex;justify-content:space-between;align-items:baseline;font-size:26px;font-weight:800;margin:12px 0}
 input[type=text],input[type=number],input[type=url]{width:100%;font:inherit;padding:13px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
-.qr{background:#fff;border:2px solid var(--sky);border-radius:16px;padding:12px;text-align:center}.qr svg{width:100%;max-width:230px;height:auto}
+.qr{background:#fff;border:2px solid var(--sky);border-radius:16px;padding:12px;text-align:center;margin-top:12px}.qr svg{width:100%;max-width:230px;height:auto}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 .kpi small{color:var(--mut);font-weight:600}.kpi b{display:block;font-size:26px}
 .rep{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px}
@@ -65,7 +65,7 @@ dialog{border:0;border-radius:var(--r);padding:20px;width:min(420px,92vw);color:
 <div id="sell" class="app">
  <main>
   <div class="card">
-   <div class="lab">Type</div><div class="seg" id="types"></div>
+   <div class="hide"><div class="lab">Type</div><div class="seg" id="types"></div></div>
    <div id="cupsBox"><div class="lab">Flavors per cup</div><div class="seg" id="cups"></div></div>
   </div>
   <div id="menu"></div>
@@ -105,6 +105,7 @@ dialog{border:0;border-radius:var(--r);padding:20px;width:min(420px,92vw);color:
   </div>
   <div class="mut" id="syncInfo" style="margin-top:8px"></div>
  </div>
+ <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Flavor photos</h3><div class="mut" style="margin-bottom:8px">Tap Add photo to pick a picture for each flavor. Saved on this device.</div><div id="photoList"></div></div>
  <div class="card" style="margin-top:12px">
   <div class="row"><button class="btn sec" id="csv">Download CSV</button><button class="btn ghost" id="clearAll" style="color:#c0392b">Clear all sales data</button></div>
   <div class="mut" style="margin-top:8px">Clearing only affects this device. Rows already in Google Sheets stay there.</div>
@@ -125,6 +126,7 @@ const h=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Objec
 const ls=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const q=new URLSearchParams(location.search),qs=(k)=>q.get(k) || "";
 const startupCfg={pp:qs("pp"),gs:qs("gs")};
+let photos=ls("refv_photos",{});
 let custom=ls("refv_custom",[]),orders=ls("refv_orders",[]),cfg=ls("refv_cfg",{pp:startupCfg.pp,gs:startupCfg.gs});
 if(startupCfg.pp)cfg.pp=startupCfg.pp;if(startupCfg.gs)cfg.gs=startupCfg.gs;sv("refv_cfg",cfg);
 const validGS=u=>/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/)?macros\/s\/[\w-]+\/exec/.test(u);
@@ -192,7 +194,7 @@ function renderSell(){
   allFlavors().filter(f=>f.c===cat).forEach(f=>{
    const idx=S.picks.findIndex(p=>p.n===f.n);
    const b=h("button",{class:"fl"+(idx>=0?" on":""),onclick:()=>{if(idx>=0)S.picks.splice(idx,1);else{if(S.picks.length>=n)S.picks.shift();S.picks.push(f)}renderSell()}},
-    h("img",{src:`images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`,alt:f.n,loading:"lazy"}),h("div",{class:"t"},h("b",{text:f.n}),h("span",{class:"chip",text:baht(m[cat])})));
+    h("img",{src:photos[f.n]||`images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`,alt:f.n,loading:"lazy"}),h("div",{class:"t"},h("b",{text:f.n}),h("span",{class:"chip",text:baht(m[cat])})));
    if(idx>=0&&n===2)b.append(h("div",{class:"n",text:idx+1}));
    if(f.x){const w=h("div",{style:"position:relative"},b,h("button",{class:"x",text:"✕",title:"Remove flavor",onclick:()=>{if(confirm(`Remove "${f.n}"?`)){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom);S.picks=S.picks.filter(p=>p.n!==f.n);renderSell()}}}));g.append(w)}else g.append(b)});
   g.append(h("button",{class:"fl new",onclick:()=>{pendingCat=cat;$("dTitle").textContent=`New ${cat} flavor`;$("dName").value="";$("dlg").showModal()}},h("div",{text:"＋ New flavor"})));
@@ -298,7 +300,18 @@ async function refreshSharedState(){
   if (typeof renderReport === 'function') renderReport();
 }
 
+function resizePhoto(file){return new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{const s=480/Math.max(im.width,im.height,480),w=Math.round(im.width*Math.min(1,s)),hh=Math.round(im.height*Math.min(1,s)),c=document.createElement("canvas");c.width=w;c.height=hh;c.getContext("2d").drawImage(im,0,0,w,hh);res(c.toDataURL("image/jpeg",.8))};im.src=r.result};r.readAsDataURL(file)})}
+function renderPhotos(){const L=$("photoList");if(!L)return;L.innerHTML="";
+  allFlavors().forEach(f=>{const inp=h("input",{type:"file",accept:"image/*",class:"hide"});
+   inp.onchange=async()=>{const file=inp.files[0];if(!file)return;try{photos[f.n]=await resizePhoto(file);try{localStorage.setItem("refv_photos",JSON.stringify(photos))}catch(x){throw x}renderPhotos();renderSell()}catch(e){delete photos[f.n];alert("Could not save this photo (storage full or unsupported file).")}};
+   const src=photos[f.n]||`images/${typeof f.i==="number"?"g"+f.i:f.i}.jpg`;
+   L.append(h("div",{style:"display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line)"},
+    h("img",{src,alt:f.n,style:"width:56px;height:56px;border-radius:12px;object-fit:cover;background:var(--sky)"}),
+    h("div",{style:"flex:1;min-width:0"},h("b",{text:f.n}),h("div",{class:"mut",text:f.c})),
+    inp,h("button",{class:"btn sec",text:photos[f.n]?"Change":"Add photo",style:"padding:10px 14px",onclick:()=>inp.click()}),
+    photos[f.n]?h("button",{class:"btn ghost",text:"✕",style:"padding:10px 12px",onclick:()=>{delete photos[f.n];sv("refv_photos",photos);renderPhotos();renderSell()}}):""))})}
 function renderSettings(){
+  renderPhotos();
  const ppEl=$("pp"),gsEl=$("gs");
  if(ppEl) ppEl.value=cfg.pp || "";
  if(gsEl) gsEl.value=cfg.gs || "";
