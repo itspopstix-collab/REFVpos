@@ -118,7 +118,7 @@ dialog{border:0;border-radius:var(--r);padding:20px;width:min(420px,92vw);color:
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 const CATS=["Original","Premium","Signature"];
-const BASE=[["Holy Cow!","Original",6],["Thai Tea","Original","thai-tea"],["Pecan't Sleep","Premium",5],["70% Into Dark Side","Premium",1],["Weirdly Wonderful","Premium",4],["Chocolate with Cherry Jam","Premium",1],["Nutting to Prove","Signature","nutting"],["Matcha Snob","Signature",2]].map(([n,c,i])=>({n,c,i}));
+const BASE=[["Holy Cow!","Original",6],["Thai Tea","Original","thai-tea"],["Pecan't Sleep","Premium",5],["70% Into Dark Side","Premium",1],["Weirdly Wonderful","Premium",4],["Nutting to Prove","Signature","nutting"],["Matcha Snob","Signature",2]].map(([n,c,i])=>({n,c,i}));
 const PRICE={g1:{Original:79,Premium:89,Signature:99},g2:{Original:40,Premium:45,Signature:50},aff:{Original:79,Premium:84,Signature:89}};
 const AFFOGATO_PRICE={Original:79,Premium:84,Signature:89};
 const $=id=>document.getElementById(id),baht=n=>"฿"+Math.round(n).toLocaleString();
@@ -126,7 +126,7 @@ const h=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Objec
 const ls=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const q=new URLSearchParams(location.search),qs=(k)=>q.get(k) || "";
 const startupCfg={pp:qs("pp"),gs:qs("gs")};
-let photos=ls("refv_photos",{});
+let photos=ls("refv_photos",{}),hidden=ls("refv_hidden",[]);
 let custom=ls("refv_custom",[]),orders=ls("refv_orders",[]),cfg=ls("refv_cfg",{pp:startupCfg.pp,gs:startupCfg.gs});
 if(startupCfg.pp)cfg.pp=startupCfg.pp;if(startupCfg.gs)cfg.gs=startupCfg.gs;sv("refv_cfg",cfg);
 const validGS=u=>/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/)?macros\/s\/[\w-]+\/exec/.test(u);
@@ -174,7 +174,7 @@ const mkItem=(type,cups,drink,picks)=>{
  return {type,cups:type==="gelato"?cups:1,drink:type==="affogato"?"Espresso":"",parts,price:parts.reduce((s,p)=>s+p.price,0)};
 };
 const desc=i=>(i.type==="affogato"?"Affogato":`Gelato ×${i.cups}`)+": "+i.parts.map(p=>p.name).join(" + ");
-const allFlavors=()=>[...BASE,...custom.map(x=>({...x,x:1}))];
+const allFlavors=()=>[...BASE.filter(b=>!hidden.includes(b.n)),...custom.map(x=>({...x,x:1}))];
 
 /* ---------- tabs ---------- */
 function showTab(t){["sell","report","settings"].forEach(k=>$(k).classList.toggle("hide",k!==t));
@@ -309,7 +309,8 @@ function renderPhotos(){const L=$("photoList");if(!L)return;L.innerHTML="";
     h("img",{src,alt:f.n,style:"width:56px;height:56px;border-radius:12px;object-fit:cover;background:var(--sky)"}),
     h("div",{style:"flex:1;min-width:0"},h("b",{text:f.n}),h("div",{class:"mut",text:f.c})),
     inp,h("button",{class:"btn sec",text:photos[f.n]?"Change":"Add photo",style:"padding:10px 14px",onclick:()=>inp.click()}),
-    photos[f.n]?h("button",{class:"btn ghost",text:"✕",style:"padding:10px 12px",onclick:()=>{delete photos[f.n];sv("refv_photos",photos);renderPhotos();renderSell()}}):""))})}
+    h("button",{class:"btn ghost",text:"✕",title:"Remove flavor",style:"padding:10px 12px",onclick:()=>{if(!confirm(`Remove "${f.n}"?`))return;delete photos[f.n];sv("refv_photos",photos);if(f.x){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom)}else{hidden.push(f.n);sv("refv_hidden",hidden)}S.picks=S.picks.filter(p=>p.n!==f.n);renderPhotos();renderSell()}})))});
+  if(hidden.length)L.append(h("button",{class:"btn ghost",text:`Restore ${hidden.length} removed flavor${hidden.length>1?"s":""}`,style:"margin-top:8px",onclick:()=>{hidden=[];sv("refv_hidden",hidden);renderPhotos();renderSell()}}))}
 function renderSettings(){
   renderPhotos();
  const ppEl=$("pp"),gsEl=$("gs");
