@@ -14,6 +14,11 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .tabs{display:flex;background:#fff;border-radius:99px;padding:4px;box-shadow:0 1px 4px #0001}
 .tabs button{padding:9px 16px;border-radius:99px;font-weight:600;color:var(--mut)}
 .tabs button.on{background:var(--pri);color:#fff}
+@keyframes spin{100%{transform:rotate(360deg)}}
+.spin{display:inline-block;animation:spin .8s linear infinite}
+.refresh-btn{display:flex;align-items:center;gap:6px;background:#fff;color:var(--pri);font-weight:700;font-size:13px;padding:8px 14px;border-radius:99px;box-shadow:0 1px 4px #0001;border:1px solid var(--line);transition:transform .1s}
+.refresh-btn:active{transform:scale(.96)}
+@media(max-width:540px){.refresh-txt{display:none}.refresh-btn{padding:8px 10px}}
 .app{display:grid;grid-template-columns:1fr;gap:16px;max-width:1200px;margin:0 auto;padding:0 16px 140px}
 @media(min-width:900px){.app{grid-template-columns:1fr 380px;padding-bottom:24px}}
 .card{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:0 2px 10px #118cd114}
@@ -59,8 +64,13 @@ dialog{border:0;border-radius:var(--r);padding:20px;width:min(420px,92vw);color:
 .toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:var(--ok);color:#fff;padding:12px 20px;border-radius:99px;font-weight:700;z-index:20;box-shadow:0 6px 20px #0003}
 .hide{display:none!important}.mut{color:var(--mut);font-size:14px}.row{display:flex;gap:8px;flex-wrap:wrap}
 </style></head><body>
-<header><img class="logo" src="images/logo.png" alt="REFV Gelatogato">
-<nav class="tabs" id="tabs"></nav></header>
+<header>
+ <img class="logo" src="images/logo.png" alt="REFV Gelatogato">
+ <div style="display:flex;align-items:center;gap:8px">
+  <button id="refreshBtn" class="refresh-btn" title="Refresh flavors & sync with Google Sheets"><span id="refreshIcon">🔄</span><span class="refresh-txt">Refresh</span></button>
+  <nav class="tabs" id="tabs"></nav>
+ </div>
+</header>
 
 <div id="sell" class="app">
  <main>
@@ -252,6 +262,27 @@ if($("newFlavorBtn"))$("newFlavorBtn").onclick=()=>{$("dName").value="";if($("dC
 $("dName").onkeydown=e=>{if(e.key==="Enter")$("dOk").click()};
 
 const toast=(m,c)=>{const t=h("div",{class:"toast",text:m});if(c)t.style.background=c;document.body.append(t);setTimeout(()=>t.remove(),4000)};
+async function handleManualRefresh(){
+  const btn=$("refreshBtn"), ico=$("refreshIcon"), txt=btn?.querySelector(".refresh-txt");
+  if(btn) btn.disabled=true;
+  if(ico) ico.classList.add("spin");
+  if(txt) txt.textContent="Updating...";
+  try{
+    await syncFromIDB();
+    const updated = await loadCentralFlavors();
+    if(cfg.gs&&validGS(cfg.gs)){
+      await refreshSharedState();
+    }
+    toast(updated ? "✓ Menu refreshed from Sheet!" : "✓ POS is up to date");
+  }catch(e){
+    toast("Refresh failed", "#c0392b");
+  }finally{
+    if(ico) ico.classList.remove("spin");
+    if(txt) txt.textContent="Refresh";
+    if(btn) btn.disabled=false;
+  }
+}
+if($("refreshBtn"))$("refreshBtn").onclick=handleManualRefresh;
 /* ---------- cart & payment ---------- */
 const cartTotal=()=>cart.reduce((s,i)=>s+i.price,0);
 function ppPayload(id,amt){id=id.replace(/\D/g,"");const f=(t,v)=>t+String(v.length).padStart(2,"0")+v;
@@ -363,7 +394,9 @@ async function loadCentralFlavors(){
     sv('refv_sheet_flavors',sheetFlavors);
     renderSell();
     if(typeof renderPhotos==='function')renderPhotos();
+    return true;
   }
+  return false;
 }
 
 async function loadCentralReport(){
