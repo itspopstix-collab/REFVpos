@@ -325,20 +325,44 @@ async function loadCentralConfig(){
   } catch(e) {}
 }
 
+const SHEET_ID="1VsOG-E4S9A4tUvPaw467d9KO4VRSn79k2HmJIhfZUkw";
 async function loadCentralFlavors(){
-  if(!cfg.gs||!validGS(cfg.gs)) return;
-  const url = cfg.gs + (cfg.gs.includes('?') ? '&' : '?') + 'mode=flavors';
-  try {
-    const r = await fetch(url,{cache:'no-store'});
-    if(!r.ok) return;
-    const data = await r.json();
-    if(data && Array.isArray(data.flavors) && data.flavors.length){
-      sheetFlavors = data.flavors;
-      sv('refv_sheet_flavors', sheetFlavors);
-      renderSell();
-      if(typeof renderPhotos === 'function') renderPhotos();
+  let list=[];
+  if(cfg.gs&&validGS(cfg.gs)){
+    try{
+      const r=await fetch(cfg.gs+(cfg.gs.includes('?')?'&':'?')+'mode=flavors',{cache:'no-store'});
+      if(r.ok){const data=await r.json();if(data&&Array.isArray(data.flavors)&&data.flavors.length)list=data.flavors}
+    }catch(e){}
+  }
+  if(!list.length&&SHEET_ID){
+    for(const tab of ['Flavors','Sheet1']){
+      try{
+        const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${tab}&ts=${Date.now()}`,{cache:'no-store'});
+        if(r.ok){
+          const txt=await r.text();
+          if(txt&&txt.trim().length>10){
+            const rows=txt.trim().split(/\r?\n/).map(l=>l.replace(/^"|"$/g,'').split('","'));
+            if(rows.length>1){
+              for(let i=1;i<rows.length;i++){
+                const [n,c,st,im]=rows[i];
+                if(!n||!n.trim()||n.toLowerCase().includes('flavor name'))continue;
+                const status=(st||'Active').trim().toLowerCase();
+                if(status==='inactive'||status==='disabled')continue;
+                list.push({n:n.trim(),c:(c||'Original').trim(),i:(im||'').trim()||'g6'});
+              }
+              if(list.length)break;
+            }
+          }
+        }
+      }catch(e){}
     }
-  } catch(e) {}
+  }
+  if(list.length){
+    sheetFlavors=list;
+    sv('refv_sheet_flavors',sheetFlavors);
+    renderSell();
+    if(typeof renderPhotos==='function')renderPhotos();
+  }
 }
 
 async function loadCentralReport(){
@@ -425,9 +449,6 @@ async function renderReport(){
 }
 renderSell();renderCart();showTab("sell");
 syncFromIDB();
-loadProjectConfig();
-if(cfg.gs){
-  refreshSharedState();
-  send(orders.filter(o=>!o.synced&&!o.sample));
-}
+loadCentralFlavors();
+loadProjectConfig().then(()=>{loadCentralFlavors();if(cfg.gs){refreshSharedState();send(orders.filter(o=>!o.synced&&!o.sample))}});
 </script></body></html>
