@@ -348,7 +348,8 @@ async function loadCentralFlavors(){
                 if(!n||!n.trim()||n.toLowerCase().includes('flavor name'))continue;
                 const status=(st||'Active').trim().toLowerCase();
                 if(status==='inactive'||status==='disabled')continue;
-                list.push({n:n.trim(),c:(c||'Original').trim(),i:(im||'').trim()||'g6'});
+                const match=BASE.find(b=>b.n.toLowerCase()===n.trim().toLowerCase());
+                list.push({n:n.trim(),c:(c||'Original').trim(),i:(im||'').trim()||(match?match.i:'g6')});
               }
               if(list.length)break;
             }
