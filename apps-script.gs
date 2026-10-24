@@ -1,13 +1,15 @@
 /**
  * REFV POS - Google Apps Script backend.
- * Paste into the Sheet: Extensions > Apps Script, then Deploy > New deployment >
- * Web app (Execute as: Me, Who has access: Anyone). Copy the /exec URL into the POS Settings.
+ * Paste into the Sheet: Extensions > Apps Script, then Deploy > Manage deployments >
+ * Edit (pencil) > Version: New version > Deploy.
  *
  * Sheets used (auto-created):
  *   "Sales"    - one row per cup sold
+ *   "Flavors"  - menu flavors (Name, Category, Status, Image URL)
  *   "Settings" - key/value (stores PromptPay number)
  */
 const SALES = 'Sales';
+const FLAVORS = 'Flavors';
 const SETTINGS = 'Settings';
 
 function sheet_(name) {
@@ -35,9 +37,43 @@ function setPP_(pp) {
   sh.getRange(sh.getLastRow(), 2).setNumberFormat('@').setValue(pp);
 }
 
+/** Seed and read flavors from the Flavors tab */
+function readFlavors_() {
+  const sh = sheet_(FLAVORS);
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(['Flavor Name', 'Category', 'Status', 'Image URL']);
+    sh.setFrozenRows(1);
+    const defaults = [
+      ['Holy Cow!', 'Original', 'Active', ''],
+      ['Thai Tea', 'Original', 'Active', ''],
+      ["Pecan't Sleep", 'Premium', 'Active', ''],
+      ['70% Into Dark Side', 'Premium', 'Active', ''],
+      ['Weirdly Wonderful', 'Premium', 'Active', ''],
+      ['Nutting to Prove', 'Signature', 'Active', ''],
+      ['Matcha Snob', 'Signature', 'Active', '']
+    ];
+    sh.getRange(2, 1, defaults.length, 4).setValues(defaults);
+  }
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const rows = sh.getRange(2, 1, last - 1, 4).getValues();
+  const list = [];
+  rows.forEach(r => {
+    const name = String(r[0] || '').trim();
+    const cat = String(r[1] || 'Original').trim();
+    const status = String(r[2] || 'Active').trim().toLowerCase();
+    const img = String(r[3] || '').trim();
+    if (!name) return;
+    if (status === 'inactive' || status === 'disabled' || status === 'hidden') return;
+    list.push({ n: name, c: cat, i: img || 'g6' });
+  });
+  return list;
+}
+
 function doGet(e) {
   const mode = e && e.parameter && e.parameter.mode;
-  if (mode === 'config') return json_({ pp: getPP_() });
+  if (mode === 'config') return json_({ pp: getPP_(), flavors: readFlavors_() });
+  if (mode === 'flavors') return json_({ flavors: readFlavors_() });
   if (mode === 'report') return json_({ sales: readSales_() });
   return ContentService.createTextOutput('REFV POS ready');
 }
@@ -49,6 +85,23 @@ function doPost(e) {
     const data = JSON.parse(e.postData.contents);
     if (data.type === 'config') {
       setPP_(String(data.pp || ''));
+      return ContentService.createTextOutput('ok');
+    }
+    if (data.type === 'new_flavor') {
+      const sh = sheet_(FLAVORS);
+      if (sh.getLastRow() === 0) readFlavors_();
+      sh.appendRow([String(data.n || '').trim(), String(data.c || 'Original').trim(), 'Active', '']);
+      return ContentService.createTextOutput('ok');
+    }
+    if (data.type === 'delete_flavor') {
+      const sh = sheet_(FLAVORS);
+      const rows = sh.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]).trim().toLowerCase() === String(data.n).trim().toLowerCase()) {
+          sh.getRange(i + 1, 3).setValue('Inactive');
+          return ContentService.createTextOutput('ok');
+        }
+      }
       return ContentService.createTextOutput('ok');
     }
     const rows = data.rows || [], head = data.head || [];

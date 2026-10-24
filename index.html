@@ -146,17 +146,19 @@ async function idbSet(k,v){try{const db=await getDB();return new Promise(res=>{c
 const ls=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}idbSet(k,v)};
 const q=new URLSearchParams(location.search),qs=(k)=>q.get(k) || "";
 const startupCfg={pp:qs("pp"),gs:qs("gs")};
+let sheetFlavors=ls("refv_sheet_flavors",null);
 let photos=ls("refv_photos",{}),hidden=ls("refv_hidden",[]);
 let custom=ls("refv_custom",[]),orders=ls("refv_orders",[]),cfg=ls("refv_cfg",{pp:startupCfg.pp,gs:startupCfg.gs});
 if(startupCfg.pp)cfg.pp=startupCfg.pp;if(startupCfg.gs)cfg.gs=startupCfg.gs;sv("refv_cfg",cfg);
 async function syncFromIDB(){
  try{
-  const [p,c,h,o]=await Promise.all([idbGet("refv_photos",null),idbGet("refv_custom",null),idbGet("refv_hidden",null),idbGet("refv_orders",null)]);
+  const [p,c,h,o,sf]=await Promise.all([idbGet("refv_photos",null),idbGet("refv_custom",null),idbGet("refv_hidden",null),idbGet("refv_orders",null),idbGet("refv_sheet_flavors",null)]);
   let ch=false;
   if(p&&Object.keys(p).length){photos={...photos,...p};ch=true}
   if(Array.isArray(c)&&c.length){const m=new Map();[...custom,...c].forEach(x=>m.set(x.n,x));custom=Array.from(m.values());ch=true}
   if(Array.isArray(h)&&h.length){hidden=Array.from(new Set([...hidden,...h]));ch=true}
   if(Array.isArray(o)&&o.length){orders=mergeOrders(orders,o);ch=true}
+  if(Array.isArray(sf)&&sf.length){sheetFlavors=sf;ch=true}
   if(ch){renderSell();if(typeof renderPhotos==="function")renderPhotos()}
  }catch(e){}
 }
@@ -205,7 +207,13 @@ const mkItem=(type,cups,drink,picks)=>{
  return {type,cups:type==="gelato"?cups:1,drink:type==="affogato"?"Espresso":"",parts,price:parts.reduce((s,p)=>s+p.price,0)};
 };
 const desc=i=>(i.type==="affogato"?"Affogato":`Gelato ×${i.cups}`)+": "+i.parts.map(p=>p.name).join(" + ");
-const allFlavors=()=>[...BASE.filter(b=>!hidden.includes(b.n)),...custom.map(x=>({...x,x:1}))];
+const allFlavors=()=>{
+  const baseList=(Array.isArray(sheetFlavors)&&sheetFlavors.length)?sheetFlavors:BASE;
+  const map=new Map();
+  baseList.forEach(f=>{if(!hidden.includes(f.n))map.set(f.n,{...f})});
+  custom.forEach(f=>{if(!hidden.includes(f.n))map.set(f.n,{...f,x:1})});
+  return Array.from(map.values());
+};
 
 /* ---------- tabs ---------- */
 function showTab(t){["sell","report","settings"].forEach(k=>$(k).classList.toggle("hide",k!==t));
@@ -237,7 +245,9 @@ function renderSell(){
 $("addBtn").onclick=()=>{cart.push(mkItem(S.type,S.cups,S.drink,S.picks));S.picks=[];renderSell();renderCart()};
 $("dNo").onclick=()=>$("dlg").close();
 $("dOk").onclick=()=>{const v=$("dName").value.trim(),cat=$("dCat")?$("dCat").value:"Original";if(!v)return;if(allFlavors().some(f=>f.n.toLowerCase()===v.toLowerCase())){alert("This flavor already exists");return}
- custom.push({n:v,c:cat,i:"g6"});sv("refv_custom",custom);$("dlg").close();renderPhotos();renderSell()};
+ custom.push({n:v,c:cat,i:"g6"});sv("refv_custom",custom);$("dlg").close();renderPhotos();renderSell();
+ if(cfg.gs&&validGS(cfg.gs)){fetch(cfg.gs,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'new_flavor',n:v,c:cat})}).then(()=>loadCentralFlavors()).catch(()=>{})}
+};
 if($("newFlavorBtn"))$("newFlavorBtn").onclick=()=>{$("dName").value="";if($("dCat"))$("dCat").value="Original";$("dlg").showModal()};
 $("dName").onkeydown=e=>{if(e.key==="Enter")$("dOk").click()};
 
@@ -306,6 +316,28 @@ async function loadCentralConfig(){
       sv('refv_cfg', cfg);
       renderSettings();
     }
+    if(data && Array.isArray(data.flavors) && data.flavors.length){
+      sheetFlavors = data.flavors;
+      sv('refv_sheet_flavors', sheetFlavors);
+      renderSell();
+      if(typeof renderPhotos === 'function') renderPhotos();
+    }
+  } catch(e) {}
+}
+
+async function loadCentralFlavors(){
+  if(!cfg.gs||!validGS(cfg.gs)) return;
+  const url = cfg.gs + (cfg.gs.includes('?') ? '&' : '?') + 'mode=flavors';
+  try {
+    const r = await fetch(url,{cache:'no-store'});
+    if(!r.ok) return;
+    const data = await r.json();
+    if(data && Array.isArray(data.flavors) && data.flavors.length){
+      sheetFlavors = data.flavors;
+      sv('refv_sheet_flavors', sheetFlavors);
+      renderSell();
+      if(typeof renderPhotos === 'function') renderPhotos();
+    }
   } catch(e) {}
 }
 
@@ -325,6 +357,7 @@ async function loadCentralReport(){
 async function refreshSharedState(){
   if(!cfg.gs||!validGS(cfg.gs)) return;
   await loadCentralConfig();
+  await loadCentralFlavors();
   const sharedOrders = await loadCentralReport();
   orders = mergeOrders(orders, sharedOrders);
   sv('refv_orders', orders);
@@ -341,7 +374,7 @@ function renderPhotos(){const L=$("photoList");if(!L)return;L.innerHTML="";
     h("img",{src,alt:f.n,style:"width:56px;height:56px;border-radius:12px;object-fit:cover;background:var(--sky)"}),
     h("div",{style:"flex:1;min-width:0"},h("b",{text:f.n}),h("div",{class:"mut",text:f.c})),
     inp,h("button",{class:"btn sec",text:photos[f.n]?"Change":"Add photo",style:"padding:10px 14px",onclick:()=>inp.click()}),
-    h("button",{class:"btn ghost",text:"✕",title:"Remove flavor",style:"padding:10px 12px",onclick:()=>{if(!confirm(`Remove "${f.n}"?`))return;delete photos[f.n];sv("refv_photos",photos);if(f.x){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom)}else{hidden.push(f.n);sv("refv_hidden",hidden)}S.picks=S.picks.filter(p=>p.n!==f.n);renderPhotos();renderSell()}})))});
+    h("button",{class:"btn ghost",text:"✕",title:"Remove flavor",style:"padding:10px 12px",onclick:()=>{if(!confirm(`Remove "${f.n}"?`))return;delete photos[f.n];sv("refv_photos",photos);if(f.x){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom)}else{hidden.push(f.n);sv("refv_hidden",hidden)}S.picks=S.picks.filter(p=>p.n!==f.n);renderPhotos();renderSell();if(cfg.gs&&validGS(cfg.gs)){fetch(cfg.gs,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'delete_flavor',n:f.n})}).then(()=>loadCentralFlavors()).catch(()=>{})}}})))});
   if(hidden.length)L.append(h("button",{class:"btn ghost",text:`Restore ${hidden.length} removed flavor${hidden.length>1?"s":""}`,style:"margin-top:8px",onclick:()=>{hidden=[];sv("refv_hidden",hidden);renderPhotos();renderSell()}}))}
 function renderSettings(){
   renderPhotos();
