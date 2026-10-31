@@ -151,7 +151,7 @@ const BASE=[
 ].map(([n,c,i])=>({n,c,i}));
 const PRICE={g1:{Original:79,Premium:89,Signature:99},g2:{Original:40,Premium:45,Signature:50},aff:{Original:79,Premium:84,Signature:89}};
 const AFFOGATO_PRICE={Original:79,Premium:84,Signature:89};
-const $=id=>document.getElementById(id),baht=n=>"฿"+Math.round(n).toLocaleString();
+const $=id=>document.getElementById(id),baht=n=>{const num=Math.round(n*100)/100;return "฿"+(num%1===0?num.toLocaleString():num.toFixed(2))};
 const h=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Object.entries(a)){if(x==="text")e.textContent=v;else if(x.startsWith("on"))e[x]=v;else e.setAttribute(x,v)}e.append(...k);return e};
 const DB_NAME="refv_db",DB_STORE="kv";
 function getDB(){return new Promise((res,rej)=>{if(!window.indexedDB){rej();return}const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(DB_STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -292,32 +292,43 @@ function calcCartDiscounts(){
   if(!promo||!cart.length){
     return {promoName:"",totalDiscount:0,finalTotal:rawTotal,itemDiscounts:cart.map(()=>0),itemFinalPrices:cart.map(i=>i.price)};
   }
-  const isEach=String(promo.type).trim().toLowerCase()==="each";
-  const isPct=String(promo.discType).toLowerCase().includes("percent")||String(promo.discType).includes("%");
+  const type=String(promo.type||"each").trim().toLowerCase();
+  const isEach=type==="each"||type==="item"||type==="cup";
+  const discType=String(promo.discType||"amount").trim().toLowerCase();
+  const isPct=discType.includes("percent")||discType.includes("%");
   const val=Number(promo.val)||0;
 
   if(isEach){
-    const itemDiscounts=cart.map(i=>{
-      const d=isPct?Math.round(i.price*(val/100)):val;
-      return Math.min(i.price,Math.max(0,d));
-    });
-    const totalDiscount=itemDiscounts.reduce((a,b)=>a+b,0);
-    const finalTotal=Math.max(0,rawTotal-totalDiscount);
-    const itemFinalPrices=cart.map((i,idx)=>i.price-itemDiscounts[idx]);
-    return {promoName:promo.name,totalDiscount,finalTotal,itemDiscounts,itemFinalPrices};
+    if(isPct){
+      const itemDiscounts=cart.map(i=>{
+        const d=Math.round((i.price*(val/100))*100)/100;
+        return Math.min(i.price,Math.max(0,d));
+      });
+      const totalDiscount=Math.round(itemDiscounts.reduce((a,b)=>a+b,0)*100)/100;
+      const finalTotal=Math.max(0,Math.round((rawTotal-totalDiscount)*100)/100);
+      const itemFinalPrices=cart.map((i,idx)=>Math.round((i.price-itemDiscounts[idx])*100)/100);
+      return {promoName:promo.name,totalDiscount,finalTotal,itemDiscounts,itemFinalPrices};
+    }else{
+      const itemDiscounts=cart.map(i=>Math.min(i.price,Math.max(0,val)));
+      const totalDiscount=itemDiscounts.reduce((a,b)=>a+b,0);
+      const finalTotal=Math.max(0,rawTotal-totalDiscount);
+      const itemFinalPrices=cart.map((i,idx)=>i.price-itemDiscounts[idx]);
+      return {promoName:promo.name,totalDiscount,finalTotal,itemDiscounts,itemFinalPrices};
+    }
   }else{
-    const rawDisc=isPct?Math.round(rawTotal*(val/100)):val;
-    const totalDiscount=Math.min(rawTotal,Math.max(0,rawDisc));
-    const finalTotal=Math.max(0,rawTotal-totalDiscount);
-    let rem=totalDiscount;
-    const itemDiscounts=cart.map((i,idx)=>{
-      if(idx===cart.length-1)return rem;
-      const share=rawTotal>0?Math.round(totalDiscount*(i.price/rawTotal)):0;
-      const act=Math.min(rem,share);
-      rem-=act;
-      return act;
-    });
-    const itemFinalPrices=cart.map((i,idx)=>i.price-itemDiscounts[idx]);
+    // "All" / "Bill" - Total discount divided EQUALLY to every item
+    const rawDisc=isPct ? (rawTotal * (val / 100)) : val;
+    const totalDiscount=Math.min(rawTotal,Math.max(0,Math.round(rawDisc*100)/100));
+    const finalTotal=Math.max(0,Math.round((rawTotal-totalDiscount)*100)/100);
+
+    const discPerItem=Math.round((totalDiscount/cart.length)*100)/100;
+    const itemDiscounts=cart.map(()=>discPerItem);
+    const sumDiscounts=itemDiscounts.reduce((a,b)=>a+b,0);
+    const diff=Math.round((totalDiscount-sumDiscounts)*100)/100;
+    if(diff!==0&&itemDiscounts.length>0){
+      itemDiscounts[0]=Math.round((itemDiscounts[0]+diff)*100)/100;
+    }
+    const itemFinalPrices=cart.map((i,idx)=>Math.round((i.price-itemDiscounts[idx])*100)/100);
     return {promoName:promo.name,totalDiscount,finalTotal,itemDiscounts,itemFinalPrices};
   }
 }
@@ -330,7 +341,8 @@ function renderPromoSelect(){
   promotions.forEach(p=>{
     const isPct=String(p.discType).toLowerCase().includes("percent")||String(p.discType).includes("%");
     const valText=isPct?`${p.val}% off`:`฿${p.val} off`;
-    const typeText=String(p.type).toLowerCase()==="each"?"/ cup":"bill";
+    const isEach=String(p.type).toLowerCase()==="each"||String(p.type).toLowerCase()==="cup";
+    const typeText=isEach?"/ cup":"total";
     sel.append(h("option",{value:p.name,text:`${p.name} (${valText} ${typeText})`}));
   });
   sel.value=selectedPromo;
@@ -348,14 +360,24 @@ function ppPayload(id,amt){id=id.replace(/\D/g,"");const f=(t,v)=>t+String(v.len
 
 function renderCart(){
  const L=$("lines");L.innerHTML="";
- const {promoName,totalDiscount,finalTotal}=calcCartDiscounts();
+ const {promoName,totalDiscount,finalTotal,itemDiscounts,itemFinalPrices}=calcCartDiscounts();
  const rawTotal=cartTotal();
 
  if(!cart.length){
   L.append(h("div",{class:"mut",text:"No items yet. Pick flavors and tap Add.",style:"padding:12px 0"}));
   selectedPromo="";
  }
- cart.forEach((it,i)=>L.append(h("div",{class:"line"},h("div",{},h("b",{text:desc(it)})),h("div",{style:"white-space:nowrap"},baht(it.price)+" ",h("button",{text:"✕",class:"x",style:"position:static;display:inline-block;vertical-align:middle",onclick:()=>{cart.splice(i,1);if(!cart.length)selectedPromo="";renderCart()}})))));
+ cart.forEach((it,i)=>{
+  const itemDisc=itemDiscounts[i]||0;
+  const itemFinal=itemFinalPrices[i]||it.price;
+  const priceDisplay=itemDisc>0
+   ? h("span",{},h("small",{text:baht(it.price),style:"text-decoration:line-through;color:var(--mut);margin-right:5px;font-size:12px"}),baht(itemFinal)+" ")
+   : baht(it.price)+" ";
+  L.append(h("div",{class:"line"},
+   h("div",{},h("b",{text:desc(it)})),
+   h("div",{style:"white-space:nowrap"},priceDisplay,
+    h("button",{text:"✕",class:"x",style:"position:static;display:inline-block;vertical-align:middle",onclick:()=>{cart.splice(i,1);if(!cart.length)selectedPromo="";renderCart()}}))));
+ });
 
  if($("promoBox"))$("promoBox").classList.toggle("hide",!cart.length);
  renderPromoSelect();
