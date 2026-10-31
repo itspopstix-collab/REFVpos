@@ -78,6 +78,11 @@ dialog{border:0;border-radius:var(--r);padding:20px;width:min(420px,92vw);color:
  <aside id="cart"><div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Order</h2><button class="btn ghost close" id="closeCart">Close</button></div>
   <div id="lines"></div>
+  <div id="promoBox" style="margin:10px 0 6px">
+   <div class="lab" style="margin:6px 0 4px">Promotion</div>
+   <select id="promoSel" style="width:100%;font:inherit;font-weight:600;padding:11px 12px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);cursor:pointer;outline:none"></select>
+  </div>
+  <div id="discLine" class="hide" style="display:flex;justify-content:space-between;align-items:center;color:var(--pri);font-weight:700;font-size:15px;margin:4px 0 6px"><span>Discount</span><span id="discAmt">-฿0</span></div>
   <div class="tot"><span>Total</span><span id="total"></span></div>
   <div class="lab">Payment</div>
   <div class="seg"><button id="payCash">💵 Cash</button><button id="payQR">📱 QR</button></div>
@@ -156,19 +161,21 @@ const ls=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){retu
 const q=new URLSearchParams(location.search),qs=(k)=>q.get(k) || "";
 const startupCfg={pp:qs("pp"),gs:qs("gs")};
 let sheetFlavors=ls("refv_sheet_flavors",null);
+let promotions=ls("refv_promotions",[]),selectedPromo="";
 let photos=ls("refv_photos",{}),hidden=ls("refv_hidden",[]);
 let custom=ls("refv_custom",[]),orders=ls("refv_orders",[]),cfg=ls("refv_cfg",{pp:startupCfg.pp,gs:startupCfg.gs});
 if(startupCfg.pp)cfg.pp=startupCfg.pp;if(startupCfg.gs)cfg.gs=startupCfg.gs;sv("refv_cfg",cfg);
 async function syncFromIDB(){
  try{
-  const [p,c,h,o,sf]=await Promise.all([idbGet("refv_photos",null),idbGet("refv_custom",null),idbGet("refv_hidden",null),idbGet("refv_orders",null),idbGet("refv_sheet_flavors",null)]);
+  const [p,c,h,o,sf,pr]=await Promise.all([idbGet("refv_photos",null),idbGet("refv_custom",null),idbGet("refv_hidden",null),idbGet("refv_orders",null),idbGet("refv_sheet_flavors",null),idbGet("refv_promotions",null)]);
   let ch=false;
   if(p&&Object.keys(p).length){photos={...photos,...p};ch=true}
   if(Array.isArray(c)&&c.length){const m=new Map();[...custom,...c].forEach(x=>m.set(x.n,x));custom=Array.from(m.values());ch=true}
   if(Array.isArray(h)&&h.length){hidden=Array.from(new Set([...hidden,...h]));ch=true}
   if(Array.isArray(o)&&o.length){orders=mergeOrders(orders,o);ch=true}
   if(Array.isArray(sf)&&sf.length){sheetFlavors=sf;ch=true}
-  if(ch){renderSell();if(typeof renderPhotos==="function")renderPhotos()}
+  if(Array.isArray(pr)&&pr.length){promotions=pr;ch=true}
+  if(ch){renderSell();if(typeof renderPhotos==="function")renderPhotos();renderPromoSelect()}
  }catch(e){}
 }
 const validGS=u=>/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/)?macros\/s\/[\w-]+\/exec/.test(u);
@@ -278,16 +285,98 @@ $("dName").onkeydown=e=>{if(e.key==="Enter")$("dOk").click()};
 const toast=(m,c)=>{const t=h("div",{class:"toast",text:m});if(c)t.style.background=c;document.body.append(t);setTimeout(()=>t.remove(),4000)};
 /* ---------- cart & payment ---------- */
 const cartTotal=()=>cart.reduce((s,i)=>s+i.price,0);
+
+function calcCartDiscounts(){
+  const promo=promotions.find(p=>p.name===selectedPromo);
+  const rawTotal=cartTotal();
+  if(!promo||!cart.length){
+    return {promoName:"",totalDiscount:0,finalTotal:rawTotal,itemDiscounts:cart.map(()=>0),itemFinalPrices:cart.map(i=>i.price)};
+  }
+  const isEach=String(promo.type).trim().toLowerCase()==="each";
+  const isPct=String(promo.discType).toLowerCase().includes("percent")||String(promo.discType).includes("%");
+  const val=Number(promo.val)||0;
+
+  if(isEach){
+    const itemDiscounts=cart.map(i=>{
+      const d=isPct?Math.round(i.price*(val/100)):val;
+      return Math.min(i.price,Math.max(0,d));
+    });
+    const totalDiscount=itemDiscounts.reduce((a,b)=>a+b,0);
+    const finalTotal=Math.max(0,rawTotal-totalDiscount);
+    const itemFinalPrices=cart.map((i,idx)=>i.price-itemDiscounts[idx]);
+    return {promoName:promo.name,totalDiscount,finalTotal,itemDiscounts,itemFinalPrices};
+  }else{
+    const rawDisc=isPct?Math.round(rawTotal*(val/100)):val;
+    const totalDiscount=Math.min(rawTotal,Math.max(0,rawDisc));
+    const finalTotal=Math.max(0,rawTotal-totalDiscount);
+    let rem=totalDiscount;
+    const itemDiscounts=cart.map((i,idx)=>{
+      if(idx===cart.length-1)return rem;
+      const share=rawTotal>0?Math.round(totalDiscount*(i.price/rawTotal)):0;
+      const act=Math.min(rem,share);
+      rem-=act;
+      return act;
+    });
+    const itemFinalPrices=cart.map((i,idx)=>i.price-itemDiscounts[idx]);
+    return {promoName:promo.name,totalDiscount,finalTotal,itemDiscounts,itemFinalPrices};
+  }
+}
+
+function renderPromoSelect(){
+  const sel=$("promoSel");
+  if(!sel)return;
+  sel.innerHTML="";
+  sel.append(h("option",{value:"",text:"No promotion"}));
+  promotions.forEach(p=>{
+    const isPct=String(p.discType).toLowerCase().includes("percent")||String(p.discType).includes("%");
+    const valText=isPct?`${p.val}% off`:`฿${p.val} off`;
+    const typeText=String(p.type).toLowerCase()==="each"?"/ cup":"bill";
+    sel.append(h("option",{value:p.name,text:`${p.name} (${valText} ${typeText})`}));
+  });
+  sel.value=selectedPromo;
+  sel.onchange=()=>{
+    selectedPromo=sel.value;
+    renderCart();
+  };
+}
+
 function ppPayload(id,amt){id=id.replace(/\D/g,"");const f=(t,v)=>t+String(v.length).padStart(2,"0")+v;
  const acc=id.length>=13?f("02",id):f("01","0066"+id.replace(/^0/,""));
  let p=f("00","01")+f("01","12")+f("29",f("00","A000000677010111")+acc)+f("58","TH")+f("53","764")+f("54",amt.toFixed(2))+"6304",c=0xFFFF;
  for(let i=0;i<p.length;i++){c^=p.charCodeAt(i)<<8;for(let j=0;j<8;j++)c=c&0x8000?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF}
  return p+c.toString(16).toUpperCase().padStart(4,"0")}
+
 function renderCart(){
- const L=$("lines");L.innerHTML="";const t=cartTotal();
- if(!cart.length)L.append(h("div",{class:"mut",text:"No items yet. Pick flavors and tap Add.",style:"padding:12px 0"}));
- cart.forEach((it,i)=>L.append(h("div",{class:"line"},h("div",{},h("b",{text:desc(it)})),h("div",{style:"white-space:nowrap"},baht(it.price)+" ",h("button",{text:"✕",class:"x",style:"position:static;display:inline-block;vertical-align:middle",onclick:()=>{cart.splice(i,1);renderCart()}})))));
- $("total").textContent=baht(t);$("cartBtn").textContent=cart.length?`🛒 View order · ${cart.length} item${cart.length>1?"s":""} · ${baht(t)}`:"🛒 Order is empty";
+ const L=$("lines");L.innerHTML="";
+ const {promoName,totalDiscount,finalTotal}=calcCartDiscounts();
+ const rawTotal=cartTotal();
+
+ if(!cart.length){
+  L.append(h("div",{class:"mut",text:"No items yet. Pick flavors and tap Add.",style:"padding:12px 0"}));
+  selectedPromo="";
+ }
+ cart.forEach((it,i)=>L.append(h("div",{class:"line"},h("div",{},h("b",{text:desc(it)})),h("div",{style:"white-space:nowrap"},baht(it.price)+" ",h("button",{text:"✕",class:"x",style:"position:static;display:inline-block;vertical-align:middle",onclick:()=>{cart.splice(i,1);if(!cart.length)selectedPromo="";renderCart()}})))));
+
+ if($("promoBox"))$("promoBox").classList.toggle("hide",!cart.length);
+ renderPromoSelect();
+
+ if($("discLine")){
+  if(totalDiscount>0){
+   $("discLine").classList.remove("hide");
+   $("discAmt").textContent="-"+baht(totalDiscount);
+  }else{
+   $("discLine").classList.add("hide");
+  }
+ }
+
+ if(totalDiscount>0){
+  $("total").innerHTML=`<span style="font-size:18px;color:var(--mut);text-decoration:line-through;margin-right:8px;font-weight:600">${baht(rawTotal)}</span>${baht(finalTotal)}`;
+ }else{
+  $("total").textContent=baht(rawTotal);
+ }
+
+ const t=finalTotal;
+ $("cartBtn").textContent=cart.length?`🛒 View order · ${cart.length} item${cart.length>1?"s":""} · ${baht(t)}`:"🛒 Order is empty";
  $("payCash").className=pay==="cash"?"on":"";$("payQR").className=pay==="qr"?"on":"";
  $("cashBox").classList.toggle("hide",pay!=="cash");$("qrBox").classList.toggle("hide",pay!=="qr");
  if(pay==="cash"){recv=t;$("recv").value=recv;
@@ -296,24 +385,33 @@ function renderCart(){
   else $("qrTxt").textContent=!cfg.pp?"Set your PromptPay number in Settings":!t?"Add items first":"QR library not loaded (needs internet)"}
  upd();
 }
-function upd(){const t=cartTotal();recv=+$("recv").value||0;const ch=recv-t;$("change").textContent=pay==="cash"?(ch>=0?baht(ch):"short "+baht(-ch)):"";
+
+function upd(){const {finalTotal}=calcCartDiscounts();const t=finalTotal;recv=+$("recv").value||0;const ch=recv-t;$("change").textContent=pay==="cash"?(ch>=0?baht(ch):"short "+baht(-ch)):"";
  $("confirm").disabled=!cart.length||(pay==="cash"&&recv<t)||(pay==="qr"&&!cfg.pp)}
 $("recv").oninput=upd;
 $("payCash").onclick=()=>{pay="cash";recv=0;renderCart()};$("payQR").onclick=()=>{pay="qr";renderCart()};
-$("clearCart").onclick=()=>{cart=[];pay="qr";recv=0;renderCart()};
+$("clearCart").onclick=()=>{cart=[];selectedPromo="";pay="qr";recv=0;renderCart()};
 $("cartBtn").onclick=()=>$("cart").classList.add("open");$("closeCart").onclick=()=>$("cart").classList.remove("open");
 const dkey=ts=>new Date(ts).toLocaleDateString("en-CA");
 $("confirm").onclick=()=>{
+ const {promoName,totalDiscount,finalTotal,itemDiscounts,itemFinalPrices}=calcCartDiscounts();
  const now=Date.now(),n=orders.filter(o=>dkey(o.ts)===dkey(now)).length+1;
- const o={id:dkey(now).replace(/-/g,"").slice(2)+"-"+String(n).padStart(3,"0"),ts:now,items:cart,total:cartTotal(),pay,recv:pay==="cash"?recv:cartTotal(),synced:0};
+ const itemsWithDisc=cart.map((it,idx)=>({...it,promo:promoName,discount:itemDiscounts[idx],price:it.price,finalPrice:itemFinalPrices[idx]}));
+ const o={id:dkey(now).replace(/-/g,"").slice(2)+"-"+String(n).padStart(3,"0"),ts:now,items:itemsWithDisc,promo:promoName,discount:totalDiscount,total:finalTotal,pay,recv:pay==="cash"?recv:finalTotal,synced:0};
  orders.push(o);sv("refv_orders",orders);
- const change=o.recv-o.total;cart=[];pay="qr";recv=0;$("cart").classList.remove("open");renderCart();
+ const change=o.recv-o.total;cart=[];selectedPromo="";pay="qr";recv=0;$("cart").classList.remove("open");renderCart();
  toast(`Order ${o.id} done · ${baht(o.total)}${o.pay==="cash"&&change>0?" · change "+baht(change):""}`);
  send([o]).then(ok=>{if(cfg.gs&&!ok)toast("Saved here, but NOT sent to Google Sheets. See Settings.","#d9822b")})};
 
 /* ---------- Google Sheets / CSV ---------- */
-const HEAD=["Order ID","Date","Time","Type","Flavors per cup","Flavor 1","Flavor 2","Category 1","Category 2","Payment","Amount (THB)"];
-const rowsOf=o=>o.items.map(i=>{const d=new Date(o.ts);return[o.id,dkey(o.ts),d.toLocaleTimeString("en-GB"),i.type,i.cups,i.parts[0].name,i.parts[1]?.name||"",i.parts[0].cat,i.parts[1]?.cat||"",o.pay==="qr"?"QR":"Cash",i.price]});
+const HEAD=["Order ID","Date","Time","Type","Flavors per cup","Flavor 1","Flavor 2","Category 1","Category 2","Payment","Promotion","Discount Amount","Amount (THB)"];
+const rowsOf=o=>o.items.map((i,idx)=>{
+ const d=new Date(o.ts);
+ const promo=o.promo||i.promo||"";
+ const disc=(typeof i.discount==="number")?i.discount:(idx===0?(o.discount||0):0);
+ const finalAmt=(typeof i.finalPrice==="number")?i.finalPrice:(i.price-disc);
+ return[o.id,dkey(o.ts),d.toLocaleTimeString("en-GB"),i.type,i.cups,i.parts[0].name,i.parts[1]?.name||"",i.parts[0].cat,i.parts[1]?.cat||"",o.pay==="qr"?"QR":"Cash",promo,disc,finalAmt]
+});
 let lastSync="";
 async function send(list){
  if(!cfg.gs)return true;
@@ -392,6 +490,53 @@ async function loadCentralFlavors(){
   return false;
 }
 
+async function loadCentralPromotions(){
+  let list=[];
+  if(SHEET_ID){
+    for(const tab of ['Promotion','Promotions']){
+      try{
+        const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${tab}&ts=${Date.now()}`,{cache:'no-store'});
+        if(r.ok){
+          const txt=await r.text();
+          if(txt&&txt.trim().length>10){
+            const rows=txt.trim().split(/\r?\n/).map(l=>l.replace(/^"|"$/g,'').split('","'));
+            if(rows.length>1){
+              for(let i=1;i<rows.length;i++){
+                const [n,typ,dt,val]=rows[i];
+                if(!n||!n.trim()||n.toLowerCase().includes('promotion name'))continue;
+                list.push({
+                  name:n.trim(),
+                  type:(typ||'Each').trim(),
+                  discType:(dt||'Amount').trim(),
+                  val:parseFloat(val)||0
+                });
+              }
+              if(list.length)break;
+            }
+          }
+        }
+      }catch(e){}
+    }
+  }
+  if(!list.length&&cfg.gs&&validGS(cfg.gs)){
+    try{
+      const r=await fetch(cfg.gs+(cfg.gs.includes('?')?'&':'?')+'mode=promotions',{cache:'no-store'});
+      if(r.ok){
+        const data=await r.json();
+        if(data&&Array.isArray(data.promotions)&&data.promotions.length)list=data.promotions;
+      }
+    }catch(e){}
+  }
+  if(list.length){
+    promotions=list;
+    sv('refv_promotions',promotions);
+    renderPromoSelect();
+    renderCart();
+    return true;
+  }
+  return false;
+}
+
 async function loadCentralReport(){
   if(!cfg.gs||!validGS(cfg.gs)) return [];
   const url = cfg.gs + (cfg.gs.includes('?') ? '&' : '?') + 'mode=report';
@@ -409,6 +554,7 @@ async function refreshSharedState(){
   if(!cfg.gs||!validGS(cfg.gs)) return;
   await loadCentralConfig();
   await loadCentralFlavors();
+  await loadCentralPromotions();
   const sharedOrders = await loadCentralReport();
   orders = mergeOrders(orders, sharedOrders);
   sv('refv_orders', orders);
@@ -479,6 +625,7 @@ async function renderReport(){
   renderSell();renderCart();showTab("sell");
   try{ await loadProjectConfig(); }catch(e){}
   await loadCentralFlavors();
+  await loadCentralPromotions();
   if(cfg.gs&&validGS(cfg.gs)){
     refreshSharedState();
     send(orders.filter(o=>!o.synced&&!o.sample));

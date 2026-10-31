@@ -11,6 +11,7 @@
 const SALES = 'Sales';
 const FLAVORS = 'Flavors';
 const SETTINGS = 'Settings';
+const PROMOTIONS = 'Promotion';
 
 function sheet_(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -70,10 +71,27 @@ function readFlavors_() {
   return list;
 }
 
+function readPromotions_() {
+  const sh = sheet_(PROMOTIONS);
+  if (sh.getLastRow() < 2) return [];
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+  const list = [];
+  rows.forEach(r => {
+    const name = String(r[0] || '').trim();
+    const type = String(r[1] || 'Each').trim();
+    const discType = String(r[2] || 'Amount').trim();
+    const val = Number(r[3]) || 0;
+    if (!name || name.toLowerCase().includes('name')) return;
+    list.push({ name, type, discType, val });
+  });
+  return list;
+}
+
 function doGet(e) {
   const mode = e && e.parameter && e.parameter.mode;
-  if (mode === 'config') return json_({ pp: getPP_(), flavors: readFlavors_() });
+  if (mode === 'config') return json_({ pp: getPP_(), flavors: readFlavors_(), promotions: readPromotions_() });
   if (mode === 'flavors') return json_({ flavors: readFlavors_() });
+  if (mode === 'promotions') return json_({ promotions: readPromotions_() });
   if (mode === 'report') return json_({ sales: readSales_() });
   return ContentService.createTextOutput('REFV POS ready');
 }
@@ -135,24 +153,31 @@ function doPost(e) {
 function readSales_() {
   const sh = sheet_(SALES);
   if (sh.getLastRow() < 2) return [];
-  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 11).getValues();
+  const numCols = Math.max(13, sh.getLastColumn());
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, numCols).getValues();
   const map = {}, order = [];
   rows.forEach(r => {
-    const [id, date, time, type, cups, f1, f2, c1, c2, pay, amt] = r.map(x => x);
+    const id = r[0];
     if (!id) return;
     const key = String(id);
+    const date = r[1], time = r[2], type = r[3], cups = r[4], f1 = r[5], f2 = r[6], c1 = r[7], c2 = r[8], pay = r[9];
+    const is13 = r.length >= 13;
+    const promo = is13 ? String(r[10] || '') : '';
+    const disc = is13 ? (Number(r[11]) || 0) : 0;
+    const amt = is13 ? (Number(r[12]) || 0) : (Number(r[10]) || 0);
     if (!map[key]) {
       const d = new Date(String(date) + 'T' + String(time) + '+07:00');
       map[key] = {
         id: key, ts: isNaN(d) ? Date.now() : d.getTime(), items: [], total: 0,
-        pay: String(pay).toUpperCase() === 'QR' ? 'qr' : 'cash', synced: 1
+        pay: String(pay).toUpperCase() === 'QR' ? 'qr' : 'cash', synced: 1,
+        promo: promo || undefined
       };
       order.push(key);
     }
     const price = Number(amt) || 0, n = Number(cups) || 1;
     const parts = [{ name: f1, cat: c1, price: n === 2 ? price / 2 : price }];
     if (f2) parts.push({ name: f2, cat: c2, price: price / 2 });
-    map[key].items.push({ type: String(type), cups: n, drink: '', parts, price });
+    map[key].items.push({ type: String(type), cups: n, drink: '', parts, price, discount: disc, promo });
     map[key].total += price;
   });
   return order.map(k => { map[k].recv = map[k].total; return map[k]; });
