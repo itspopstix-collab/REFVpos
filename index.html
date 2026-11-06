@@ -277,8 +277,10 @@ function renderSell(){
 $("addBtn").onclick=()=>{cart.push(mkItem(S.type,S.cups,S.drink,S.picks));S.picks=[];renderSell();renderCart()};
 $("dNo").onclick=()=>$("dlg").close();
 $("dOk").onclick=()=>{const v=$("dName").value.trim(),cat=$("dCat")?$("dCat").value:"Original";if(!v)return;if(allFlavors().some(f=>f.n.toLowerCase()===v.toLowerCase())){alert("This flavor already exists");return}
- custom.push({n:v,c:cat,i:"g6"});sv("refv_custom",custom);$("dlg").close();renderPhotos();renderSell();
- if(cfg.gs&&validGS(cfg.gs)){fetch(cfg.gs,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'new_flavor',n:v,c:cat})}).then(()=>loadCentralFlavors()).catch(()=>{})}
+ const nf={n:v,c:cat,i:"g6"};
+ if(Array.isArray(sheetFlavors)&&sheetFlavors.length){sheetFlavors.push(nf);sv("refv_sheet_flavors",sheetFlavors)}else{custom.push(nf);sv("refv_custom",custom)}
+ $("dlg").close();renderPhotos();renderSell();
+ if(cfg.gs&&validGS(cfg.gs)){fetch(cfg.gs,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'new_flavor',n:v,c:cat})}).then(()=>setTimeout(()=>loadCentralFlavors(),1500)).catch(()=>{})}
 };
 if($("newFlavorBtn"))$("newFlavorBtn").onclick=()=>{$("dName").value="";if($("dCat"))$("dCat").value="Original";$("dlg").showModal()};
 $("dName").onkeydown=e=>{if(e.key==="Enter")$("dOk").click()};
@@ -496,7 +498,7 @@ function fetchSheetGviz(tab){
 async function loadCentralFlavors(){
   let list=[];
   if(SHEET_ID){
-    for(const tab of ['Flavors','Sheet1']){
+    for(const tab of ['Flavor','Flavors','Sheet1']){
       try{
         let rows=await fetchSheetGviz(tab);
         if(!rows||!rows.length){
@@ -626,7 +628,7 @@ function renderPhotos(){const L=$("photoList");if(!L)return;L.innerHTML="";
     h("img",{src,alt:f.n,style:"width:56px;height:56px;border-radius:12px;object-fit:cover;background:var(--sky)",onerror:(e)=>{e.target.style.opacity="0.25"}}),
     h("div",{style:"flex:1;min-width:0"},h("b",{text:f.n}),h("div",{class:"mut",text:f.c})),
     inp,h("button",{class:"btn sec",text:photos[f.n]?"Change":"Add photo",style:"padding:10px 14px",onclick:()=>inp.click()}),
-    h("button",{class:"btn ghost",text:"✕",title:"Remove flavor",style:"padding:10px 12px",onclick:()=>{if(!confirm(`Remove "${f.n}"?`))return;delete photos[f.n];sv("refv_photos",photos);if(f.x){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom)}else{hidden.push(f.n);sv("refv_hidden",hidden)}S.picks=S.picks.filter(p=>p.n!==f.n);renderPhotos();renderSell();if(cfg.gs&&validGS(cfg.gs)){fetch(cfg.gs,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'delete_flavor',n:f.n})}).then(()=>loadCentralFlavors()).catch(()=>{})}}})))});
+    h("button",{class:"btn ghost",text:"✕",title:"Remove flavor",style:"padding:10px 12px",onclick:()=>{if(!confirm(`Remove "${f.n}"?`))return;delete photos[f.n];sv("refv_photos",photos);if(Array.isArray(sheetFlavors)&&sheetFlavors.length){sheetFlavors=sheetFlavors.filter(x=>x.n!==f.n);sv("refv_sheet_flavors",sheetFlavors)}else if(f.x){custom=custom.filter(c=>c.n!==f.n);sv("refv_custom",custom)}else{hidden.push(f.n);sv("refv_hidden",hidden)}S.picks=S.picks.filter(p=>p.n!==f.n);renderPhotos();renderSell();if(cfg.gs&&validGS(cfg.gs)){fetch(cfg.gs,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'delete_flavor',n:f.n})}).then(()=>setTimeout(()=>loadCentralFlavors(),1500)).catch(()=>{})}}})))});
   if(hidden.length)L.append(h("button",{class:"btn ghost",text:`Restore ${hidden.length} removed flavor${hidden.length>1?"s":""}`,style:"margin-top:8px",onclick:()=>{hidden=[];sv("refv_hidden",hidden);renderPhotos();renderSell()}}))}
 function renderSettings(){
   renderPhotos();

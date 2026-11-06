@@ -9,12 +9,18 @@
  *   "Settings" - key/value (stores PromptPay number)
  */
 const SALES = 'Sales';
-const FLAVORS = 'Flavors';
+const FLAVORS = 'Flavor';
 const SETTINGS = 'Settings';
 const PROMOTIONS = 'Promotion';
 
 function sheet_(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (name === FLAVORS) {
+    return ss.getSheetByName('Flavor') || ss.getSheetByName('Flavors') || ss.insertSheet('Flavor');
+  }
+  if (name === PROMOTIONS) {
+    return ss.getSheetByName('Promotion') || ss.getSheetByName('Promotions') || ss.insertSheet('Promotion');
+  }
   return ss.getSheetByName(name) || ss.insertSheet(name);
 }
 
