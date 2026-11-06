@@ -160,20 +160,19 @@ async function idbSet(k,v){try{const db=await getDB();return new Promise(res=>{c
 const ls=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}idbSet(k,v)};
 const q=new URLSearchParams(location.search),qs=(k)=>q.get(k) || "";
 const startupCfg={pp:qs("pp"),gs:qs("gs")};
-let sheetFlavors=ls("refv_sheet_flavors",null);
+let sheetFlavors=null;
 let promotions=ls("refv_promotions",[]),selectedPromo="";
-let photos=ls("refv_photos",{}),hidden=ls("refv_hidden",[]);
-let custom=ls("refv_custom",[]),orders=ls("refv_orders",[]),cfg=ls("refv_cfg",{pp:startupCfg.pp,gs:startupCfg.gs});
+let photos=ls("refv_photos",{}),hidden=[];
+let custom=[],orders=ls("refv_orders",[]),cfg=ls("refv_cfg",{pp:startupCfg.pp,gs:startupCfg.gs});
+try{localStorage.removeItem("refv_custom");localStorage.removeItem("refv_hidden");localStorage.removeItem("refv_sheet_flavors")}catch(e){}
+idbSet("refv_custom",[]);idbSet("refv_hidden",[]);idbSet("refv_sheet_flavors",null);
 if(startupCfg.pp)cfg.pp=startupCfg.pp;if(startupCfg.gs)cfg.gs=startupCfg.gs;sv("refv_cfg",cfg);
 async function syncFromIDB(){
  try{
-  const [p,c,h,o,sf,pr]=await Promise.all([idbGet("refv_photos",null),idbGet("refv_custom",null),idbGet("refv_hidden",null),idbGet("refv_orders",null),idbGet("refv_sheet_flavors",null),idbGet("refv_promotions",null)]);
+  const [p,o,pr]=await Promise.all([idbGet("refv_photos",null),idbGet("refv_orders",null),idbGet("refv_promotions",null)]);
   let ch=false;
   if(p&&Object.keys(p).length){photos={...photos,...p};ch=true}
-  if(Array.isArray(c)&&c.length){const m=new Map();[...custom,...c].forEach(x=>m.set(x.n,x));custom=Array.from(m.values());ch=true}
-  if(Array.isArray(h)&&h.length){hidden=Array.from(new Set([...hidden,...h]));ch=true}
   if(Array.isArray(o)&&o.length){orders=mergeOrders(orders,o);ch=true}
-  if(Array.isArray(sf)&&sf.length){sheetFlavors=sf;ch=true}
   if(Array.isArray(pr)&&pr.length){promotions=pr;ch=true}
   if(ch){renderSell();if(typeof renderPhotos==="function")renderPhotos();renderPromoSelect()}
  }catch(e){}
@@ -472,28 +471,53 @@ async function loadCentralConfig(){
 }
 
 const SHEET_ID="1VsOG-E4S9A4tUvPaw467d9KO4VRSn79k2HmJIhfZUkw";
+function fetchSheetGviz(tab){
+  return new Promise(resolve=>{
+    const cbName='__refvGviz_'+tab.replace(/\W/g,'')+'_'+Date.now()+'_'+Math.floor(Math.random()*1e4);
+    const s=document.createElement('script');
+    const timer=setTimeout(()=>{cleanup();resolve(null)},6000);
+    function cleanup(){
+      clearTimeout(timer);
+      try{delete window[cbName]}catch(e){window[cbName]=undefined}
+      if(s.parentNode)s.parentNode.removeChild(s);
+    }
+    window[cbName]=function(resp){
+      cleanup();
+      if(!resp||resp.status!=='ok'||!resp.table||!Array.isArray(resp.table.rows)){resolve(null);return}
+      const rows=resp.table.rows.map(r=>(r&&Array.isArray(r.c))?r.c.map(cell=>cell&&(cell.v!==null&&cell.v!==undefined)?String(cell.v):''):[]);
+      resolve(rows);
+    };
+    s.onerror=()=>{cleanup();resolve(null)};
+    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(tab)}&tqx=responseHandler:${cbName}&ts=${Date.now()}`;
+    document.head.appendChild(s);
+  });
+}
+
 async function loadCentralFlavors(){
   let list=[];
   if(SHEET_ID){
     for(const tab of ['Flavors','Sheet1']){
       try{
-        const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${tab}&ts=${Date.now()}`,{cache:'no-store'});
-        if(r.ok){
-          const txt=await r.text();
-          if(txt&&txt.trim().length>10){
-            const rows=txt.trim().split(/\r?\n/).map(l=>l.replace(/^"|"$/g,'').split('","'));
-            if(rows.length>1){
-              for(let i=1;i<rows.length;i++){
-                const [n,c,st,im]=rows[i];
-                if(!n||!n.trim()||n.toLowerCase().includes('flavor name'))continue;
-                const status=(st||'Active').trim().toLowerCase();
-                if(status==='inactive'||status==='disabled'||status==='hidden')continue;
-                const match=BASE.find(b=>b.n.toLowerCase()===n.trim().toLowerCase());
-                list.push({n:n.trim(),c:(c||'Original').trim(),i:(im||'').trim()||(match?match.i:'')});
-              }
-              if(list.length)break;
+        let rows=await fetchSheetGviz(tab);
+        if(!rows||!rows.length){
+          const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${tab}&ts=${Date.now()}`,{cache:'no-store',credentials:'omit'});
+          if(r.ok){
+            const txt=await r.text();
+            if(txt&&txt.trim().length>10){
+              rows=txt.trim().split(/\r?\n/).map(l=>l.replace(/^"|"$/g,'').split('","'));
             }
           }
+        }
+        if(rows&&rows.length){
+          for(let i=0;i<rows.length;i++){
+            const [n,c,st,im]=rows[i];
+            if(!n||!n.trim()||n.toLowerCase().includes('flavor name'))continue;
+            const status=(st||'Active').trim().toLowerCase();
+            if(status==='inactive'||status==='disabled'||status==='hidden')continue;
+            const match=BASE.find(b=>b.n.toLowerCase()===n.trim().toLowerCase());
+            list.push({n:n.trim(),c:(c||'Original').trim(),i:(im||'').trim()||(match?match.i:'')});
+          }
+          if(list.length)break;
         }
       }catch(e){}
     }
@@ -523,25 +547,28 @@ async function loadCentralPromotions(){
   if(SHEET_ID){
     for(const tab of ['Promotion','Promotions']){
       try{
-        const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${tab}&ts=${Date.now()}`,{cache:'no-store'});
-        if(r.ok){
-          const txt=await r.text();
-          if(txt&&txt.trim().length>10){
-            const rows=txt.trim().split(/\r?\n/).map(l=>l.replace(/^"|"$/g,'').split('","'));
-            if(rows.length>1){
-              for(let i=1;i<rows.length;i++){
-                const [n,typ,dt,val]=rows[i];
-                if(!n||!n.trim()||n.toLowerCase().includes('promotion name'))continue;
-                list.push({
-                  name:n.trim(),
-                  type:(typ||'Each').trim(),
-                  discType:(dt||'Amount').trim(),
-                  val:parseFloat(val)||0
-                });
-              }
-              if(list.length)break;
+        let rows=await fetchSheetGviz(tab);
+        if(!rows||!rows.length){
+          const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${tab}&ts=${Date.now()}`,{cache:'no-store',credentials:'omit'});
+          if(r.ok){
+            const txt=await r.text();
+            if(txt&&txt.trim().length>10){
+              rows=txt.trim().split(/\r?\n/).map(l=>l.replace(/^"|"$/g,'').split('","'));
             }
           }
+        }
+        if(rows&&rows.length){
+          for(let i=0;i<rows.length;i++){
+            const [n,typ,dt,val]=rows[i];
+            if(!n||!n.trim()||n.toLowerCase().includes('promotion name'))continue;
+            list.push({
+              name:n.trim(),
+              type:(typ||'Each').trim(),
+              discType:(dt||'Amount').trim(),
+              val:parseFloat(val)||0
+            });
+          }
+          if(list.length)break;
         }
       }catch(e){}
     }
