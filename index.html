@@ -224,9 +224,11 @@ const mkItem=(type,cups,drink,picks)=>{
 };
 const desc=i=>(i.type==="affogato"?"Affogato":`Gelato ×${i.cups}`)+": "+i.parts.map(p=>p.name).join(" + ");
 const allFlavors=()=>{
-  const baseList=(Array.isArray(sheetFlavors)&&sheetFlavors.length)?sheetFlavors:BASE;
+  if(Array.isArray(sheetFlavors)&&sheetFlavors.length){
+    return sheetFlavors.map(f=>({...f}));
+  }
   const map=new Map();
-  baseList.forEach(f=>{if(!hidden.includes(f.n))map.set(f.n,{...f})});
+  BASE.forEach(f=>{if(!hidden.includes(f.n))map.set(f.n,{...f})});
   custom.forEach(f=>{if(!hidden.includes(f.n))map.set(f.n,{...f,x:1})});
   return Array.from(map.values());
 };
@@ -460,7 +462,7 @@ async function loadCentralConfig(){
       sv('refv_cfg', cfg);
       renderSettings();
     }
-    if(data && Array.isArray(data.flavors) && data.flavors.length){
+    if(data && Array.isArray(data.flavors) && data.flavors.length && (!Array.isArray(sheetFlavors) || !sheetFlavors.length)){
       sheetFlavors = data.flavors;
       sv('refv_sheet_flavors', sheetFlavors);
       renderSell();
@@ -472,13 +474,7 @@ async function loadCentralConfig(){
 const SHEET_ID="1VsOG-E4S9A4tUvPaw467d9KO4VRSn79k2HmJIhfZUkw";
 async function loadCentralFlavors(){
   let list=[];
-  if(cfg.gs&&validGS(cfg.gs)){
-    try{
-      const r=await fetch(cfg.gs+(cfg.gs.includes('?')?'&':'?')+'mode=flavors',{cache:'no-store'});
-      if(r.ok){const data=await r.json();if(data&&Array.isArray(data.flavors)&&data.flavors.length)list=data.flavors}
-    }catch(e){}
-  }
-  if(!list.length&&SHEET_ID){
+  if(SHEET_ID){
     for(const tab of ['Flavors','Sheet1']){
       try{
         const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${tab}&ts=${Date.now()}`,{cache:'no-store'});
@@ -491,7 +487,7 @@ async function loadCentralFlavors(){
                 const [n,c,st,im]=rows[i];
                 if(!n||!n.trim()||n.toLowerCase().includes('flavor name'))continue;
                 const status=(st||'Active').trim().toLowerCase();
-                if(status==='inactive'||status==='disabled')continue;
+                if(status==='inactive'||status==='disabled'||status==='hidden')continue;
                 const match=BASE.find(b=>b.n.toLowerCase()===n.trim().toLowerCase());
                 list.push({n:n.trim(),c:(c||'Original').trim(),i:(im||'').trim()||(match?match.i:'')});
               }
@@ -502,9 +498,19 @@ async function loadCentralFlavors(){
       }catch(e){}
     }
   }
+  if(!list.length&&cfg.gs&&validGS(cfg.gs)){
+    try{
+      const r=await fetch(cfg.gs+(cfg.gs.includes('?')?'&':'?')+'mode=flavors',{cache:'no-store'});
+      if(r.ok){const data=await r.json();if(data&&Array.isArray(data.flavors)&&data.flavors.length)list=data.flavors}
+    }catch(e){}
+  }
   if(list.length){
     sheetFlavors=list;
+    custom=[];
+    hidden=[];
     sv('refv_sheet_flavors',sheetFlavors);
+    sv('refv_custom',custom);
+    sv('refv_hidden',hidden);
     renderSell();
     if(typeof renderPhotos==='function')renderPhotos();
     return true;
